@@ -1,0 +1,26 @@
+
+# to keep empty data dirs
+!**.gitignore
+
+__pycache__
+*.mkv
+*.mp4
+*.MP4
+*.avi
+*.jpg
+*.JPG
+*.jpeg
+*.JPEG
+*.png
+*.PNG
+*.ogg
+*.OGG
+audio/*
+hugin_work_dir/*
+.emacs.desktop
+.emacs.desktop.lock
+global_motions.trf
+transforms.trf
+cam_rotations.txt
+crop_margins_rectilinear.txt
+crop_margins_reprojection.txt
