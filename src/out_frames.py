@@ -28,8 +28,8 @@ def output_frames():
 
 def output_video():
     cfg = config.cfg
-    
-    crf = '16'
+
+    crf = '15'
     f = 'pad=ceil(iw/2)*2:ceil(ih/2)*2,format=yuv420p'
     ivid = path.join(cfg.frames_stabilized, '%06d.jpg')
     iaud = path.join(cfg.audio_dir, 'audio.ogg')
@@ -48,7 +48,7 @@ def output_video():
 
 def get_motions():
     cfg = config.cfg
-    
+
     motions = []
     f = open(path.join(cfg.datapath, 'vidstab', 'global_motions.trf'))
     lines = f.read().splitlines()
@@ -80,15 +80,13 @@ def create_tasks_and_transform(only_show_graph=False):
         exit()
     else:
         motions = gauss_filter(motions_abs)
-        
+
         tasks = []
         imgs = sorted(os.listdir(cfg.frames_in))
 
-        ## calculate FOVs from optical center
-        
-        proj_x, proj_y = hugin.pano_trafo()
-        proj_crop_x = proj_x-cfg.pto.crop_l
-        proj_crop_y = proj_y-cfg.pto.crop_t        
+        lens_center_x, lens_center_y = lens_shift()
+        proj_crop_x = lens_center_x-cfg.pto.crop_l
+        proj_crop_y = lens_center_y-cfg.pto.crop_t
         half_crop_w = round(cfg.pto.crop_w/2)
         half_crop_h = round(cfg.pto.crop_h/2)
         delta_x = proj_crop_x-half_crop_w
@@ -103,11 +101,21 @@ def create_tasks_and_transform(only_show_graph=False):
         right_pix = half_crop_w - delta_x
         up_pix = half_crop_h + delta_y
         down_pix = half_crop_h - delta_y
-        
+
         left_tan_pix = left_tan/left_pix
         right_tan_pix = right_tan/right_pix
         up_tan_pix = up_tan/up_pix
         down_tan_pix = down_tan/down_pix
+
+        # ## init convetrion between cfg.stabdetect and rectiliner projections
+        # tmp_pto = path.join(cfg.hugin_projects, 'pixel_to_angle.pto')
+        # run(['pto_gen', '-o', tmp_pto, path.join(cfg.frames_in, os.listdir(cfg.frames_in)[0])],
+        #     stderr=DEVNULL, stdout=DEVNULL)
+        # run(['pto_template', '-o', tmp_pto, '--template='+cfg.pto.filepath, tmp_pto],
+        #     stdout=DEVNULL)
+        # ## set stabdetect projection
+        # run(['pano_modify', '-o', tmp_pto, '--crop=AUTO',
+        #      '--projection='+cfg.params['stabdetect_projection'], tmp_pto], stdout=DEVNULL)
 
         for i, img in enumerate(imgs):
             try:
@@ -118,6 +126,24 @@ def create_tasks_and_transform(only_show_graph=False):
             filepath = 'frame_{}.pto'.format(i+1)
 
             roll = round(0-degrees(roll), 5)
+
+            # ## get pix coord in original
+            # projection_coords = '{} {}'.format(cfg.pto.canvas_w/2+x, cfg.pto.canvas_h/2-y)
+            # ret = check_output(['pano_trafo', '-r', tmp_pto, '0'],
+            #                    input=projection_coords.encode('utf-8')).strip().split()
+            # ## get pix coord in rectilinear projection
+            # orig_coords = '{} {}'.format(float(ret[0]), float(ret[1]))
+            # ret = check_output(['pano_trafo', cfg.pto.filepath, '0'],
+            #                    input=orig_coords.encode('utf-8')).strip().split()
+
+            ## get pix coord in rectilinear projection
+            orig_coords = '{} {}'.format(cfg.pto.orig_w/2+x, cfg.pto.orig_h/2-y)
+            ret = check_output(['pano_trafo', cfg.pto.filepath, '0'],
+                               input=orig_coords.encode('utf-8')).strip().split()
+            
+            rx, ry = float(ret[0]), float(ret[1])
+            x, y = rx-(cfg.pto.canvas_w/2), (cfg.pto.canvas_h/2)-ry
+            print('Calc camera rotations for frame {}:'.format(i), x, y)
 
             if x < 0:
                 yaw_rads = atan(x*left_tan_pix)
@@ -161,13 +187,9 @@ def create_tasks_and_transform(only_show_graph=False):
         delete_filepath(base_pto_path)
 
 
-def create_cam_rotations():
-    pass
-
-
 def gauss_filter(motions):
     cfg = config.cfg
-    
+
     motions_copy = motions.copy()
     smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
     mu = smoothing

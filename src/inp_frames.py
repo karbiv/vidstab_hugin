@@ -37,8 +37,8 @@ def create_rectilinear_frames():
     frame_tasks = []
     for i, img in enumerate(imgs):
         tx, ty, roll = 0, 0, 0
-        filepath = 'frame_{}.pto'.format(i+1)
-        task = hugin_task(tx, ty, roll, img, filepath)
+        filename = 'frame_{}.pto'.format(i+1)
+        task = hugin_task(tx, ty, roll, img, filename)
         frame_tasks.append(task)
 
     ## create rectilinear frames
@@ -55,20 +55,22 @@ def create_vid_for_vidstab():
     out = path.join(cfg.datapath, "vidstab", "tostabilize.mkv")
 
     ## calculate crop for rectilinear frame, to pass to libvidstab analysis
-    stab_half_fov = int(cfg.params['stab_crop_fov'])/2
+    stab_half_fov = float(cfg.params['stab_crop_fov'])/2
 
     ## horizontal
     center_crop_w = ff(cfg.pto.crop_w)
     if cfg.pto.half_hfov > stab_half_fov:
-        center_crop_w = get_center_crop(int(cfg.params['stab_crop_fov'])/2)
+        center_crop_w = get_center_crop(float(cfg.params['stab_crop_fov'])/2)
 
     ## vertical
     center_crop_h = ff(cfg.pto.crop_h)
     if cfg.pto.half_vfov > stab_half_fov:
-        center_crop_h = get_center_crop(int(cfg.params['stab_crop_fov'])/2)
+        center_crop_h = get_center_crop(float(cfg.params['stab_crop_fov'])/2)
 
     cropf = 'crop={}:{}'.format(center_crop_w, center_crop_h)
-    filts = cropf+',format=yuv444p,normalize'
+    filts = cropf+',format=yuv444p,hqdn3d,unsharp=luma_msize_x=5:luma_msize_y=5:luma_amount=1.5'
+    filts = 'format=yuv444p,hqdn3d,unsharp=luma_msize_x=5:luma_msize_y=5:luma_amount=1.5'
+    #filts = filts+',normalize=blackpt=black:whitept=white:smoothing={}'.format(round(float(cfg.fps)/2))
 
     ## create video
     run(['ffmpeg', '-framerate', cfg.fps, '-i', inp, '-c:v', 'libx264', '-crf', '16', '-vf',

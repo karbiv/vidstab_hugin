@@ -3,7 +3,7 @@
 import os
 from os import path
 from math import tan, atan, radians, degrees
-from subprocess import run, DEVNULL, check_output
+from subprocess import run, DEVNULL
 from multiprocessing import Queue
 import config
 from utils import *
@@ -31,6 +31,12 @@ def create_rectilinear_frames(task):
     run(['pto_template', '-o', task_pto, '--template='+tmpl_pto, task_pto],
         stdout=DEVNULL, check=True)
 
+    ## set projection
+    run(['pano_modify', '--output='+task_pto, '--crop=AUTO',
+         '--projection='+str(cfg.params['stabdetect_projection']), task_pto],
+        stdout=DEVNULL)
+    
+
     out_img = path.join(cfg.frames_rectilinear, task.img)
     print('Frame: ', out_img)
 
@@ -38,18 +44,6 @@ def create_rectilinear_frames(task):
     run(['nona', '-g', '-m', 'JPEG', '-z', '95', '-o', out_img, task_pto], stdout=DEVNULL, check=True)
 
     delete_filepath(task_pto)
-
-
-def pano_trafo():
-    cfg = config.cfg
-
-    inp_coords = '{} {}'.format(round(cfg.pto.orig_w/2+cfg.pto.lens_d),
-                                round(cfg.pto.orig_h/2+cfg.pto.lens_e))
-    ret = check_output(['pano_trafo', cfg.pto.filepath, '0'],
-                       input=inp_coords.encode('utf-8'))
-    ret_coords = ret.strip().split()
-    projection_coords = (round(float(ret_coords[0])), round(float(ret_coords[1])))
-    return projection_coords
 
 
 def frames_output(task):

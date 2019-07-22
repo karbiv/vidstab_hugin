@@ -66,7 +66,7 @@ class Configuration:
             print('\nHugin project must be set to a "rectilinear" projection mode.\n')
             exit()
         if self.pto.half_hfov <= float(self.params['stab_crop_fov'])/2:
-            self.params['stab_crop_fov'] = self.pto.half_hfov
+            self.params['stab_crop_fov'] = str(self.pto.half_hfov*2)
 
         self.args = args
 
@@ -74,7 +74,7 @@ class Configuration:
         ##
         data_dir_name = re.sub(r'[/\\]+', '_', args.videofile).strip('_')
         data_dir = path.join(path.abspath(args.project), data_dir_name)
-        data_dir = '{}_ss{}_t{}'.format(data_dir, args.seek_start, args.duration)
+        data_dir = '{}_ss{}_t{}'.format(data_dir, args.seek_start or '', args.duration or '')
         data_path = Path(data_dir)
         self.datapath = data_path
 

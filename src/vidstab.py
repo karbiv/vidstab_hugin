@@ -8,7 +8,8 @@ def libvidstab_detect():
     cfg = config.cfg
 
     trf = 'transforms.trf'
-    inp = path.join(cfg.datapath, 'vidstab', 'tostabilize.mkv')
+    #inp = path.join(cfg.datapath, 'vidstab', 'tostabilize.mkv')
+    inp = cfg.args.videofile
     out = path.join(cfg.datapath, 'vidstab', 'stabilized.mkv')
 
     step = 'stepsize='+str(cfg.params['motion_detection_stepsize'])
@@ -25,17 +26,18 @@ def libvidstab_transform():
     cfg = config.cfg
 
     trf = 'transforms.trf'
-    inp = path.join(cfg.datapath, 'vidstab', 'tostabilize.mkv')
+    #inp = path.join(cfg.datapath, 'vidstab', 'tostabilize.mkv')
+    inp = cfg.args.videofile
     out = path.join(cfg.datapath, 'vidstab', 'stabilized.mkv')
 
     ## min time, for libvidstab to just create global_motions.trf file
     time = '00:00:00.250'
+    #time = '00:00:30.250'
 
     smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-    print(smoothing)
     sm = 'smoothing={0}:relative=1'.format(smoothing)
     f1 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
     f2 = 'format=yuv420p'
-    f = "{0},{1}".format(f1, f2)
+    f = "crop=(floor(iw/2))*2:(floor(ih/2))*2,{0},{1}".format(f1, f2)
     run(['ffmpeg', '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-an', '-y', out],
         cwd=cfg.vidstab_dir)
