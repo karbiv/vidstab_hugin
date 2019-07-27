@@ -66,10 +66,16 @@ if __name__ == '__main__':
     if args.stage == 0: # all stages
         ## start pipeline
         input_frames_and_audio()
-        create_rectilinear_frames()
+
+        create_projection_frames()
         create_vid_for_vidstab()
+        
         libvidstab_detect()
         libvidstab_transform()
+        libvidstab_detect_pass_2()
+        libvidstab_transform_pass_2()
+        combine_global_transforms()
+        
         output_frames()
         output_video()
         crop_scale_output()
@@ -77,15 +83,19 @@ if __name__ == '__main__':
     elif args.stage == 1:
         input_frames_and_audio()
     elif args.stage == 2:
-        create_rectilinear_frames()
-    elif args.stage == 3:
+        create_projection_frames()
         create_vid_for_vidstab()
+    elif args.stage == 3:
+        # libvidstab_detect()
+        # libvidstab_transform()
+        # libvidstab_detect_pass_2()
+        # libvidstab_transform_pass_2()
+        # libvidstab_detect_pass_3()
+        # libvidstab_transform_pass_3()
+        combine_global_transforms()
     elif args.stage == 4:
-        libvidstab_detect()
-        libvidstab_transform()
-    elif args.stage == 5:
         output_frames()
-    elif args.stage == 6:
+    elif args.stage == 5:
         output_video()
-    elif args.stage == 7:
+    elif args.stage == 6:
         crop_scale_output()

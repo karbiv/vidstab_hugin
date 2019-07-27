@@ -11,15 +11,14 @@ def crop_scale_output():
 
     min_cropw, min_croph = calculate_crop(cfg.crops_file)
 
-    #exit()
-    
     scalew = 1920
     coeff = scalew/min_cropw
     scaleh = ff(round(min_croph*coeff))
 
-    crf = str(15)
+    crf = str(24)
     iaud = path.join(cfg.audio_dir, 'audio.ogg')
-    filts = 'crop={}:{},scale={}:{}'.format(min_cropw, min_croph, scalew, scaleh)
+    #filts = 'crop={}:{},scale={}:{}'.format(min_cropw, min_croph, scalew, scaleh)
+    filts = 'crop={}:{}'.format(min_cropw, min_croph)
     
     if path.isfile(iaud):
         run(['ffmpeg', '-loglevel', 'info', '-i', ivid, '-i', iaud,
@@ -44,4 +43,5 @@ def calculate_crop(crops_filepath):
 
     #print(max_cw, max_ch)
 
+    f.close()
     return min_cw, min_ch

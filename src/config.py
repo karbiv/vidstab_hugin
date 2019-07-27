@@ -13,11 +13,15 @@ class Configuration:
     ## subdirs inside self.datapath
     hugin_projects: str = None
     frames_in: str = None
+    frames_projection: str = None
     frames_stabilized: str = None
-    frames_rectilinear: str = None
     audio_dir: str = None
     vidstab_dir: str = None
+    vidstab_dir_pass_2: str = None
+    vidstab_dir_pass_3: str = None
     ## files
+
+    combined_global_motions: str = None
     crops_file: str = None
     vidstab_hugin_ini: str = None
     rectilinear_pto: str = None
@@ -78,22 +82,28 @@ class Configuration:
         data_path = Path(data_dir)
         self.datapath = data_path
 
+        self.video_for_vidstab = path.join(self.datapath, "vidstab", "tostabilize.mkv")
         self.hugin_projects = Path(path.join(data_path, 'hugin_work_dir'))
         self.hugin_projects.mkdir(parents=True, exist_ok=True)
         self.frames_in = Path(path.join(data_path, 'frames_in'))
         self.frames_in.mkdir(parents=True, exist_ok=True)
+        self.frames_projection = Path(path.join(data_path, 'frames_projection'))
+        self.frames_projection.mkdir(parents=True, exist_ok=True)
         self.frames_stabilized = Path(path.join(data_path, 'frames_stabilized'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
-        self.frames_rectilinear = Path(path.join(data_path, 'frames_rectilinear'))
-        self.frames_rectilinear.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(data_path, 'audio'))
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.vidstab_dir = Path(path.join(data_path, 'vidstab'))
         self.vidstab_dir.mkdir(parents=True, exist_ok=True)
+        self.vidstab_dir_pass_2 = Path(path.join(data_path, 'vidstab_pass_2'))
+        self.vidstab_dir_pass_2.mkdir(parents=True, exist_ok=True)
+        self.vidstab_dir_pass_3 = Path(path.join(data_path, 'vidstab_pass_3'))
+        self.vidstab_dir_pass_3.mkdir(parents=True, exist_ok=True)
         self.output_dir = Path(path.join(data_path, 'OUTPUT'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.crops_file = path.join(self.output_dir, 'crop_margins.txt')
+        self.combined_global_motions = path.join(self.output_dir, 'global_motions.trf')
 
 
 cfg: Configuration = None

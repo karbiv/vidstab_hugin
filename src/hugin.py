@@ -19,33 +19,6 @@ frame_crop_heights = None
 frames_crop_q: Queue = None
 
 
-def create_rectilinear_frames(task):
-    '''pto is a file extension of Hugin project files'''
-    cfg = config.cfg
-
-    tmpl_pto = cfg.pto.filepath # rectilinear
-    task_pto = path.join(cfg.hugin_projects, task.pto_file)
-    run(['pto_gen', '-o', task_pto, path.join(cfg.frames_in, task.img)],
-        stderr=DEVNULL, # supress msg about failed reading of EXIF data
-        stdout=DEVNULL, check=True)
-    run(['pto_template', '-o', task_pto, '--template='+tmpl_pto, task_pto],
-        stdout=DEVNULL, check=True)
-
-    ## set projection
-    run(['pano_modify', '--output='+task_pto, '--crop=AUTO',
-         '--projection='+str(cfg.params['stabdetect_projection']), task_pto],
-        stdout=DEVNULL)
-    
-
-    out_img = path.join(cfg.frames_rectilinear, task.img)
-    print('Frame: ', out_img)
-
-    ## '-g' option, GPU, for Nona to be able to run in parallel processes
-    run(['nona', '-g', '-m', 'JPEG', '-z', '95', '-o', out_img, task_pto], stdout=DEVNULL, check=True)
-
-    delete_filepath(task_pto)
-
-
 def frames_output(task):
     '''pto is a file extension of Hugin project files'''
     cfg = config.cfg
@@ -80,6 +53,32 @@ def frames_output(task):
     tmp_hugp = HuginPTO(task_pto)
     frames_crop_q.put((tmp_hugp.crop_l, tmp_hugp.crop_r,
                        tmp_hugp.crop_t, tmp_hugp.crop_b), True)
+
+    delete_filepath(task_pto)
+
+
+def create_projection_frames(task):
+    '''pto is a file extension of Hugin project files'''
+    cfg = config.cfg
+
+    tmpl_pto = cfg.pto.filepath
+    task_pto = path.join(cfg.hugin_projects, task.pto_file)
+    run(['pto_gen', '-o', task_pto, path.join(cfg.frames_in, task.img)],
+        stderr=DEVNULL, # supress msg about failed reading of EXIF data
+        stdout=DEVNULL, check=True)
+    run(['pto_template', '-o', task_pto, '--template='+tmpl_pto, task_pto],
+        stdout=DEVNULL, check=True)
+
+    ## set projection
+    run(['pano_modify', '--output='+task_pto, '--crop=AUTO',
+         '--projection='+str(cfg.params['stabdetect_projection']), task_pto],
+        stdout=DEVNULL)
+
+    out_img = path.join(cfg.frames_projection, task.img)
+    print('Frame: ', out_img)
+
+    ## '-g' option, GPU, for Nona to be able to run in parallel processes
+    run(['nona', '-g', '-m', 'JPEG', '-z', '95', '-o', out_img, task_pto], stdout=DEVNULL, check=True)
 
     delete_filepath(task_pto)
 
