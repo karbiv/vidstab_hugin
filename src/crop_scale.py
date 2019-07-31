@@ -4,10 +4,11 @@ import config
 from utils import ff, delete_files_in_dir
 
 def crop_scale_output():
+    print('crop_scale_output()')
     cfg = config.cfg
     
     ivid = path.join(cfg.output_dir, 'output.mkv')
-    ovid = path.join(cfg.output_dir, 'scaled.mkv')
+    ovid = path.join(cfg.output_dir, 'cropped.mkv')
 
     min_cropw, min_croph = calculate_crop(cfg.crops_file)
 
@@ -17,15 +18,16 @@ def crop_scale_output():
 
     crf = str(24)
     iaud = path.join(cfg.audio_dir, 'audio.ogg')
-    #filts = 'crop={}:{},scale={}:{}'.format(min_cropw, min_croph, scalew, scaleh)
-    filts = 'crop={}:{}'.format(min_cropw, min_croph)
+    filts = 'crop={}:{},scale={}:{}'.format(min_cropw, min_croph, scalew, scaleh)
+    #filts = 'crop={}:{}'.format(min_cropw, min_croph)
     
     if path.isfile(iaud):
-        run(['ffmpeg', '-loglevel', 'info', '-i', ivid, '-i', iaud,
+        run(['ffmpeg', '-loglevel', 'error', '-stats',
+             '-i', ivid, '-i', iaud,
              '-vf', filts, '-c:v', 'libx264', '-crf', crf, '-c:a', 'copy', '-y', ovid])
     else:
-        run(['ffmpeg', '-loglevel', 'info', '-i', ivid,
-             '-vf', filts, '-c:v', 'libx264', '-crf', crf, '-an', '-y', ovid])
+        run(['ffmpeg', '-loglevel', 'error', '-stats',
+             '-i', ivid, '-vf', filts, '-c:v', 'libx264', '-crf', crf, '-an', '-y', ovid])
 
 
 # TODO calculate zoom for each frame, instead of minimal crop

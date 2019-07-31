@@ -98,6 +98,7 @@ def get_global_motions(from_dir):
 
     motions = []
     f = open(path.join(from_dir, 'global_motions.trf'))
+    
     lines = f.read().splitlines()
     for line in lines:
         if not line[0] == '#':

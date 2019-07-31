@@ -13,14 +13,14 @@ class Configuration:
     ## subdirs inside self.datapath
     hugin_projects: str = None
     frames_in: str = None
-    frames_projection: str = None
     frames_stabilized: str = None
     audio_dir: str = None
     vidstab_dir: str = None
     vidstab_dir_pass_2: str = None
     vidstab_dir_pass_3: str = None
-    ## files
+    vidstab_dir_pass_4: str = None
 
+    ## files
     combined_global_motions: str = None
     crops_file: str = None
     vidstab_hugin_ini: str = None
@@ -69,8 +69,6 @@ class Configuration:
         if not self.pto.is_rectilinear:
             print('\nHugin project must be set to a "rectilinear" projection mode.\n')
             exit()
-        if self.pto.half_hfov <= float(self.params['stab_crop_fov'])/2:
-            self.params['stab_crop_fov'] = str(self.pto.half_hfov*2)
 
         self.args = args
 
@@ -87,8 +85,6 @@ class Configuration:
         self.hugin_projects.mkdir(parents=True, exist_ok=True)
         self.frames_in = Path(path.join(data_path, 'frames_in'))
         self.frames_in.mkdir(parents=True, exist_ok=True)
-        self.frames_projection = Path(path.join(data_path, 'frames_projection'))
-        self.frames_projection.mkdir(parents=True, exist_ok=True)
         self.frames_stabilized = Path(path.join(data_path, 'frames_stabilized'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(data_path, 'audio'))
@@ -99,6 +95,8 @@ class Configuration:
         self.vidstab_dir_pass_2.mkdir(parents=True, exist_ok=True)
         self.vidstab_dir_pass_3 = Path(path.join(data_path, 'vidstab_pass_3'))
         self.vidstab_dir_pass_3.mkdir(parents=True, exist_ok=True)
+        self.vidstab_dir_pass_4 = Path(path.join(data_path, 'vidstab_pass_4'))
+        self.vidstab_dir_pass_4.mkdir(parents=True, exist_ok=True)
         self.output_dir = Path(path.join(data_path, 'OUTPUT'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
 

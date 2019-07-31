@@ -5,18 +5,15 @@ import utils
 import datatypes
 
 
-filt_for_pass_2 = 'crop=floor(iw/2.1)*2:floor(ih/2.1)*2'
-filt_for_pass_3 = 'crop=floor(iw/2.2)*2:floor(ih/2.2)*2'
-filt_for_pass_4 = 'crop=floor(iw/2.5)*2:floor(ih/2.3)*2'
-
-# filt_for_pass_1 = 'scale=floor(iw/4)*2:floor(ih/4)*2'
-# filt_for_pass_2 = 'scale=floor(iw/2)*2:floor(ih/2)*2'
-
+crop_for_pass_2 = 'crop=floor(iw/2.1)*2:floor(ih/2.1)*2'
+crop_for_pass_3 = 'crop=floor(iw/2.5)*2:floor(ih/2.2)*2'
+crop_for_pass_4 = 'crop=floor(iw/2.8)*2:floor(ih/2.3)*2'
+о
 ## pixels step size for detect phase in libvidstab
-stepsize_pass_1 = 6
-stepsize_pass_2 = 4
-stepsize_pass_3 = 2
-stepsize_pass_4 = 2
+stepsize_pass_1 = 5
+stepsize_pass_2 = 2
+stepsize_pass_3 = 1
+stepsize_pass_4 = 1
 
 
 def libvidstab_detect():
@@ -53,7 +50,7 @@ def libvidstab_transform():
     f1 = 'format=yuv444p'
     f2 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
 
-    f = "{},{},{}".format(filt_for_pass_2, f1, f2)
+    f = "{},{},{}".format(crop_for_pass_2, f1, f2)
     run(['ffmpeg', '-loglevel', 'error', '-stats',
          '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
         cwd=cfg.vidstab_dir)
@@ -93,7 +90,7 @@ def libvidstab_transform_pass_2():
     f2 = 'format=yuv444p'
 
     time = '00:00:00.150'
-    f = "{},{},{}".format(filt_for_pass_3, f1, f2)
+    f = "{},{},{}".format(crop_for_pass_3, f1, f2)
     run(['ffmpeg', '-loglevel', 'error', '-stats',
          '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
         cwd=cfg.vidstab_dir_pass_2)
