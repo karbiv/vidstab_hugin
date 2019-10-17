@@ -8,7 +8,6 @@ import config
 import inp_frames
 import vidstab
 import out_frames
-from crop_scale import *
 
 
 def signal_handler(signalnum, frame):
@@ -35,7 +34,16 @@ class CreateProjectAction(Action):
         setattr(namespace, self.dest, path.abspath(value[0]))
 
 
+class InputVideoAction(Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        if not value:
+            setattr(namespace, self.dest, True)
+        else:
+            setattr(namespace, self.dest, value)
+
+
 num_of_stages = 10
+
 parser = ArgumentParser(description="Stabilize video.",
                         formatter_class=RawTextHelpFormatter)
 
@@ -50,12 +58,9 @@ parser.add_argument('-s', '--stage', type=int, nargs='?', required=False,
                     choices=range(1, num_of_stages+1), default=0,
                     help='Stage number. 3 stages overall:'+
                     '\n\t 1) input frames\n\t 2) vidstab\n\t 3) output frames\n\n')
-parser.add_argument('-ss', dest='seek_start', type=str, nargs='?', required=False,
-                    default='00:00:00.000',
-                    help='Seek start, FFMPEG time format.')
-parser.add_argument('-t', dest='duration', type=str, nargs='?', required=False,
-                    default=None,
-                    help='Duration from seek start(-ss), FFMPEG time format.')
+parser.add_argument('-i', '--original_input', type=int, nargs='?', required=False, default=0,
+                    action=InputVideoAction,
+                    help='Passes original video to libvidstab without creating input projection video')
 
 
 if __name__ == '__main__':
@@ -65,34 +70,46 @@ if __name__ == '__main__':
 
     if args.stage == 0: # all stages
         ## start pipeline
+
         inp_frames.input_frames_and_audio()
-        inp_frames.frames_projection()
-        inp_frames.create_video_for_vidstab()
+        if not args.original_input:
+            inp_frames.frames_projection()
+            inp_frames.create_video_for_vidstab()
 
-        vidstab.detect_1()
-        vidstab.transform_1()
-        out_frames.frames_1()
-        out_frames.out_video_1()
+        if not args.original_input:
+            vidstab.detect()
+            vidstab.transform()
+        else:
+            vidstab.detect_original()
+            vidstab.transform_original()
 
-        vidstab.detect_2()
-        vidstab.transform_2()
-        vidstab.combine_global_transforms()
-        out_frames.frames_2()
-        out_frames.out_video_2()
+        out_frames.calc_camera_transforms()
+        out_frames.frames()
+
+        out_frames.video()
+
+        out_frames.out_filter()
 
         ## end pipeline
     elif args.stage == 1:
         inp_frames.input_frames_and_audio()
-        inp_frames.frames_projection()
-        inp_frames.create_video_for_vidstab()
+        if not args.original_input:
+            inp_frames.frames_projection()
+            inp_frames.create_video_for_vidstab()
     elif args.stage == 2:
-        vidstab.detect_1()
-        vidstab.transform_1()
-        out_frames.frames_1()
-        out_frames.out_video_1()
+        if not args.original_input:
+            vidstab.detect()
+            vidstab.transform()
+        else:
+            vidstab.detect_original()
+            vidstab.transform_original()
     elif args.stage == 3:
-        vidstab.detect_2()
-        vidstab.transform_2()
-        vidstab.combine_global_transforms()
-        out_frames.frames_2()
-        out_frames.out_video_2()
+        out_frames.calc_camera_transforms()
+        out_frames.frames()
+    elif args.stage == 4:
+        out_frames.video()
+    elif args.stage == 5:
+        out_frames.out_filter()
+    # clean up files to save space, not included in stage 0
+    elif args.stage == 6:
+        out_frames.cleanup()

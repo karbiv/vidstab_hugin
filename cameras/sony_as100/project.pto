@@ -1,11 +1,15 @@
 # hugin project file
 #hugin_ptoversion 2
-p f0 w4300 h2580 v141  E7.87774 R0 S207,3949,792,1863 n"TIFF_m c:LZW"
+p f0 w2900 h1663 v139  E7.87774 R0 S146,2855,480,1250 n"TIFF_m c:LZW"
 m i0
 
 # image lines
 #-hugin  cropFactor=1
-i w1920 h1080 f20 v136.4 Ra0 Rb0 Rc0 Rd0 Re0 Eev7.87774412556869 Er1 Eb1 r0 p0 y0 TrX0 TrY0 TrZ0 Tpy0 Tpp0 j0 a0 b0 c0.006 d8.23 e-28.25 g0 t0 Va1 Vb0 Vc0 Vd0 Vx0 Vy0  Vm5 n"flip_gimp_1920.jpg"
+<<<<<<< HEAD:cameras/sony_as100/rectilinear.pto
+i w1920 h1080 f20 v137.604008056827 Ra0 Rb0 Rc0 Rd0 Re0 Eev7.87774412556869 Er1 Eb1 r0 p0 y0 TrX0 TrY0 TrZ0 Tpy0 Tpp0 j0 a0.001 b0 c0.004 d-8 e-34 g0 t0 Va1 Vb0 Vc0 Vd0 Vx0 Vy0  Vm5 n"flip_gimp_1920.jpg"
+=======
+i w1920 h1080 f20 v137.5 Ra0 Rb0 Rc0 Rd0 Re0 Eev7.87774412556869 Er1 Eb1 r0 p0 y0 TrX0 TrY0 TrZ0 Tpy0 Tpp0 j0 a-0.001 b0.007 c0 d11 e-27 g0 t0 Va1 Vb0 Vc0 Vd0 Vx0 Vy0  Vm5 n"flip_gimp_1920.jpg"
+>>>>>>> testing_approaches:cameras/sony_as100/project.pto
 
 
 # specify variables that should be optimized

@@ -4,227 +4,197 @@ import sys
 import hugin
 from multiprocessing import Pool, Queue, Process
 from subprocess import run, DEVNULL, check_output, STDOUT
-import math
-import config
-from datatypes import *
 import numpy as np
-import matplotlib.pyplot as plt
+import math
+import pickle
+import re
+import config
+import datatypes
 import utils
 
 
-motions_abs = [] # in absolute form between frames
+pto_txt: str = ''
+rpto: datatypes.HuginPTO = None
+pto: datatypes.HuginPTO = None
+tan_pix: float = 0
 
-
-def frames_2():
+def calc_camera_transforms():
+    global pto_txt, rpto, pto, tan_pix
     print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
-    input_frames = cfg.frames_in
 
-    ## create cfg.stab_pto_path file
-    run(['pto_gen', '-o', cfg.stab_pto_path,
-         path.join(input_frames, os.listdir(input_frames)[0])],
-        stderr=DEVNULL, stdout=DEVNULL)
-    run(['pto_template', '-o', cfg.stab_pto_path, '--template='+cfg.pto.filepath,
-         cfg.stab_pto_path], stdout=DEVNULL)
+    # create rectilinear pto to calculate camera rotations
+    pto_path = cfg.rectilinear_pto_path
+    run(['pto_gen', '-o', pto_path, path.join(cfg.frames_in, os.listdir(cfg.frames_in)[0])], stderr=DEVNULL, stdout=DEVNULL)
+    run(['pto_template', '-o', pto_path, '--template='+cfg.pto.filepath, pto_path], stdout=DEVNULL)
+    run(['pano_modify', '-o', pto_path,
+         '--canvas={}x{}'.format(cfg.pto.canvas_w*3, cfg.pto.canvas_h*3),
+         '--crop=AUTO', pto_path, '--projection='+str(0) ], stdout=DEVNULL)
+    rpto = datatypes.HuginPTO(pto_path)
 
-    run(['pano_modify', '--output='+cfg.stab_pto_path, '--crop=AUTO',
-         '--projection='+str(cfg.params['out_projection']),
-         cfg.stab_pto_path], stdout=DEVNULL)
+    pto = datatypes.HuginPTO(cfg.projection_pto_path)
 
-    pto = HuginPTO(cfg.stab_pto_path)
-
-    utils.delete_files_in_dir(cfg.frames_stabilized_2)
-    rotations = []
-    f = open(path.join(cfg.output_dir, 'combined_rotations.txt'))
-    lines = f.read().splitlines()
-    for line in lines:
-        if not line[0] == '#': 
-            data = line.split()
-            rotations.append((float(data[0]), float(data[1]), float(data[2])))
-    
     imgs = sorted(os.listdir(cfg.frames_in))
-    tasks = []
-    for i, img in enumerate(imgs):
-        rot = rotations[i]
-        filepath = 'frame_{}.pto'.format(i+1)
-        task = hugin_task(rot[0], rot[1], rot[2], img, filepath)
-        tasks.append(task)
+    horizont_tan = math.tan(math.radians(rpto.canv_half_hfov))
+    tan_pix = horizont_tan/(rpto.canvas_w/2)
 
-    ## multiprocessing
-    hugin.frame_crop_widths = []
-    hugin.frame_crop_heights = []
-    hugin.frames_crop_q = Queue()
+    if not cfg.args.original_input:
+        transforms_rel = utils.get_global_motions(cfg.vidstab_dir)
+    else:
+        transforms_rel = utils.get_global_motions(cfg.vidstab_orig_dir)
+    transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
+    transforms_abs_filtered = gauss_filter(transforms_abs, cfg.params['smoothing'])
 
-    ## Prepare pto file with output projection to calculate crops
-    base_pto_path = path.join(cfg.hugin_projects, 'base_crop.pto')
-    run(['pto_gen', '-o', base_pto_path, path.join(cfg.frames_in, os.listdir(cfg.frames_in)[0])],
-        stderr=DEVNULL, stdout=DEVNULL)
-    run(['pto_template', '-o', base_pto_path, '--template='+cfg.stab_pto_path, base_pto_path],
-        stdout=DEVNULL)
-    ## set projection
-    run(['pano_modify', '-o', base_pto_path, '--crop=AUTO',
-         '--projection='+cfg.params['out_projection'], base_pto_path], stdout=DEVNULL)
-    base_pto = HuginPTO(base_pto_path)
-    crop_collector = Process(target=hugin.collect_frame_crop_data,
-                             args=(hugin.frames_crop_q, base_pto))
-    crop_collector.start()
+    with open(cfg.pto.filepath, 'r') as proj_pto:
+        for line in proj_pto:
+            if line.startswith('#') or not line.strip():
+                continue
+            else:
+                pto_txt += line
 
     utils.delete_files_in_dir(cfg.hugin_projects)
-    cfg.current_output_path = cfg.frames_stabilized_2
-    cfg.current_pto_path = cfg.stab_pto_path
-    with Pool(int(cfg.params['num_processes'])) as p:
-        p.map(hugin.frames_output, tasks)
 
-    hugin.frames_crop_q.put(None, True)
-    utils.delete_filepath(base_pto_path)    
+    tasks = []
+    for i, t in enumerate(transforms_abs_filtered):
+        tasks.append((t, imgs[i]))
+
+    with Pool(int(cfg.params['num_cpus'])) as p:
+        p.map(cam_transforms, tasks)
 
 
-def frames_1():
+def cam_transforms(task):
+    cfg = config.cfg
+    t, img = task
+
+    if not cfg.args.original_input:
+        ## get original coords from projection
+        _coords = '{} {}'.format(pto.canvas_w/2+t.x, pto.canvas_h/2-t.y)
+        orig_coords = check_output(['pano_trafo', '-r', pto.filepath, '0'], input=_coords.encode('utf-8'))
+        ## get rectilinear coords from original
+        rcoords = check_output(['pano_trafo', rpto.filepath, '0'], input=orig_coords).strip().split()
+    else:
+        ## without input projection video
+        orig_coords = '{} {}'.format(cfg.pto.orig_w/2+t.x, cfg.pto.orig_h/2-t.y)
+        rcoords = check_output(['pano_trafo', rpto.filepath, '0'], input=orig_coords.encode('utf-8')).strip().split()
+
+    x, y = float(rcoords[0])-(rpto.canvas_w/2), (rpto.canvas_h/2)-float(rcoords[1])
+
+    roll = 0-math.degrees(t.roll)
+
+    yaw_rads = math.atan(x*tan_pix)
+    yaw = math.degrees(yaw_rads)
+
+    pitch_rads = math.atan(y*tan_pix)
+    pitch = 0-math.degrees(pitch_rads)
+
+    filepath = '{}.pto'.format(img)
+    curr_pto_txt = re.sub(r'n".+\.jpg"', 'n"{}"'.format(path.join(cfg.frames_in, img)), pto_txt)
+    curr_pto_txt = re.sub(r' y0 ', ' y{} '.format(round(yaw, 15)), curr_pto_txt)
+    curr_pto_txt = re.sub(r' p0 ', ' p{} '.format(round(pitch, 15)), curr_pto_txt)
+    curr_pto_txt = re.sub(r' r0 ', ' r{} '.format(round(roll, 15)), curr_pto_txt)
+
+    with open(path.join(cfg.hugin_projects, filepath), 'w') as f:
+        f.write(curr_pto_txt)
+
+    txt = 'Camera rotations for frame {}: yaw {}, pitch {}, roll {}'
+    print(txt.format(filepath, str(round(yaw, 5)).rjust(10), str(round(pitch, 5)).rjust(10), str(round(roll, 5)).rjust(10)))
+
+
+def frames():
     print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
-    imgs = sorted(os.listdir(cfg.frames_in))
-    #pto_projection = HuginPTO(cfg.projection_pto_path)
-    pto_projection = cfg.pto
-    horizont_tan = math.tan(math.radians(pto_projection.canv_half_hfov))
-    tan_pix = horizont_tan/(pto_projection.canvas_w/2)
+    ptos = sorted(os.listdir(cfg.hugin_projects))
+    tasks = []
+    for i, pto in enumerate(ptos):
+        tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.jpg', pto))
 
     utils.delete_files_in_dir(cfg.frames_stabilized)
-    motions_rel = utils.get_global_motions(cfg.vidstab_dir)
-    motions_abs_filtered = utils.gauss_filter(utils.convert_relative_motions_to_absolute(motions_rel), cfg.params['smoothing_1'])
-    tasks = []
-    for i, img in enumerate(imgs):
-        try:
-            x, y, roll = motions_abs_filtered[i].__dict__.values()
-        except Exception as e:
-            print(e)
-            x, y, roll = 0, 0, 0
-
-        roll = 0-math.degrees(roll)
-
-        ## get original coords from projection
-        _coords = '{} {}'.format(pto_projection.canvas_w/2+x, pto_projection.canvas_h/2-y)
-        orig_coords = check_output(['pano_trafo', '-r', cfg.projection_pto_path, '0'],
-                                   input=_coords.encode('utf-8')).strip().split()
-        ox, oy = float(orig_coords[0]), float(orig_coords[1])
-        
-        ## get rectilinear projection coords from original
-        _coords = '{} {}'.format(ox, oy)
-        rectil_coords = check_output(['pano_trafo', cfg.pto.filepath, '0'],
-                                     input=_coords.encode('utf-8')).strip().split()
-
-        rx, ry = float(rectil_coords[0]), float(rectil_coords[1])
-        x, y = rx-(cfg.pto.canvas_w/2), (cfg.pto.canvas_h/2)-ry
-
-        yaw_rads = math.atan(x*tan_pix)
-        yaw = math.degrees(yaw_rads)
-
-        pitch_rads = math.atan(y*tan_pix)
-        pitch = 0-math.degrees(pitch_rads)
-
-        filepath = 'frame_{}.pto_projection'.format(i+1)
-        task = hugin_task(roll, yaw, pitch, img, filepath)
-        tasks.append(task)
-
-        print('Calc camera rotations for frame {}: x {}, y {}, yaw {}, pitch {}'.format(i, x, y, yaw, pitch))
-
-    ## save camera rotations of a first vidstab stage
-    rotations_1_filepath = path.join(cfg.output_dir, 'rotations_1.txt')
-    utils.delete_filepath(rotations_1_filepath)
-    f = open(rotations_1_filepath, 'w')
-    for t in tasks:
-        f.write('{} {} {}\n'.format(t.roll, t.yaw, t.pitch))
-    f.close()
-        
-    utils.delete_files_in_dir(cfg.hugin_projects)
     cfg.current_output_path = cfg.frames_stabilized
-    ## create cfg.out_1_pto_path
-    run(['pto_gen', '-o', cfg.out_1_pto_path,
-         path.join(cfg.frames_in, os.listdir(cfg.frames_in)[0])],
-        stderr=DEVNULL, stdout=DEVNULL)
-    run(['pto_template', '-o', cfg.out_1_pto_path, '--template='+cfg.pto.filepath,
-         cfg.out_1_pto_path], stdout=DEVNULL)
-    run(['pano_modify', '-o', cfg.out_1_pto_path, '--crop=AUTO', cfg.out_1_pto_path,
-         '--projection='+str(cfg.params['vidstab_projection_2']) ],
-        stdout=DEVNULL)
-    
-    #cfg.current_pto_path = cfg.pto.filepath
-    cfg.current_pto_path = cfg.out_1_pto_path
-    with Pool(int(cfg.params['num_processes'])) as p:
+    cfg.current_pto_path = cfg.pto.filepath
+    with Pool(int(cfg.params['num_cpus'])) as p:
         p.map(hugin.frames_output, tasks)
 
 
-def out_video_1():
+def gauss_filter(transforms, smooth_percent):
+    cfg = config.cfg
+
+    transforms_copy = transforms.copy()
+    smoothing = round((int(cfg.fps)/100)*int(smooth_percent))
+    mu = smoothing
+    s = mu*2+1
+
+    sigma2 = (mu/2)**2
+
+    kernel = np.exp(-(np.arange(s)-mu)**2/sigma2)
+
+    tlen = len(transforms)
+    for i in range(tlen):
+        ## make a convolution:
+        weightsum, avg = 0.0, datatypes.transform(0, 0, 0)
+        for k in range(s):
+            idx = i+k-mu
+            if idx >= 0 and idx < tlen:
+                weightsum += kernel[k]
+                avg = utils.add_transforms(avg, utils.mult_transforms(transforms_copy[idx], kernel[k]))
+
+        if weightsum > 0:
+            avg = utils.mult_transforms(avg, 1.0/weightsum)
+            ## high frequency must be transformed away
+            transforms[i] = utils.sub_transforms(transforms[i], avg)
+
+    return transforms
+
+
+def video():
     print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
-    crf = '16'
+    crf = '17'
     ivid = path.join(cfg.frames_stabilized, '%06d.jpg')
     iaud = path.join(cfg.audio_dir, 'audio.ogg')
+    if not cfg.args.original_input:
+        output = cfg.out_video
+    else:
+        output = cfg.out_video_orig
 
-    output = cfg.out_video_1
-
-    # ## 4:3 aspect for rectilinear projection
-    # cropf = 'crop=w=floor(ih*1.3333):h=ih'
-
-    # ## 16:9 aspect for rectilinear projection
-    # cropf = 'crop=w=floor((ih*1.7777)/2)*2:h=floor(ih/2)*2'
-
-    cropf = 'crop=w=floor(iw/2)*2:h=floor(ih/2)*2'
-
+    fps = cfg.fps
     if path.isfile(iaud):
-        cmd = ['ffmpeg', '-framerate', cfg.fps, '-i', ivid, '-i', iaud,
-               '-c:v', 'libx264', '-vf', cropf, '-crf', crf, '-c:a', 'copy',
+        cmd = ['ffmpeg', '-framerate', fps, '-i', ivid, '-i', iaud, '-c:v', 'libx264',
+               '-preset', 'veryfast', '-crf', crf, '-c:a', 'copy',
                '-loglevel', 'error', '-stats', '-y', output]
     else:
-        cmd = ['ffmpeg', '-framerate', cfg.fps, '-i', ivid,
-               '-c:v', 'libx264', '-vf', cropf, '-crf', crf,
+        cmd = ['ffmpeg', '-framerate', fps, '-i', ivid, '-c:v', 'libx264',
+                '-preset', 'veryfast', '-crf', crf,
                '-loglevel', 'error', '-stats', '-an', '-y', output]
 
-    # ## test drawbox
-    # box = ',drawbox=w=(iw/2.185):x=iw/2-(iw/2.185)/2:y=0:h=ih:color=black@1:t=fill'
-    # f2 = ',crop=floor(iw/2.2)*2:floor(ih/2)*2'
-    # pad = ',pad=w=iw+floor(iw/7.45):x=floor(iw/7.45)/2:h=ih+floor(ih/2.35):y=floor(ih/2.35)/2'
-    # #pad = ',pad=w=iw+floor(iw/8):x=floor(iw/8)/2'
-    # sharpen = ',unsharp=luma_msize_x=7:luma_msize_y=7:luma_amount=2.5'
-    # cmd = ['ffmpeg', '-framerate', cfg.fps, '-i', ivid, '-i', iaud,
-    #        '-c:v', 'libx264', '-vf', f+box+f2+pad+sharpen, '-crf', crf, '-c:a', 'copy',
-    #        '-loglevel', 'error', '-stats', '-y', output]
-
-    # crop = 'crop=floor(iw/8)*2:floor(ih/4)*2'
-    # cmd = ['ffmpeg', '-framerate', cfg.fps, '-i', ivid, '-i', iaud,
-    #        '-c:v', 'libx264', '-vf', crop, '-crf', crf, '-c:a', 'copy',
-    #        '-loglevel', 'error', '-stats', '-y', output]
-
     run(cmd)
 
 
-def out_video_2():
-    print('\n {} \n'.format(sys._getframe().f_code.co_name))
+def out_filter():
     cfg = config.cfg
 
-    crf = '16'
-    f = 'crop=floor(iw/2)*2:floor(ih/2)*2'
-    ivid = path.join(cfg.frames_stabilized_2, '%06d.jpg')
-    iaud = path.join(cfg.audio_dir, 'audio.ogg')
-
-    if path.isfile(iaud):
-        cmd = ['ffmpeg', '-framerate', cfg.fps, '-i', ivid, '-i', iaud,
-               '-c:v', 'libx264', '-vf', f, '-crf', crf, '-c:a', 'copy',
-               '-loglevel', 'error', '-stats', '-y', cfg.out_video_2]
+    filts = cfg.params['out_filter']
+    crf = '18'
+    if not cfg.args.original_input:
+        ivid = cfg.out_video
+        output = path.join(cfg.output_dir, cfg.out_video_filtered)
     else:
-        cmd = ['ffmpeg', '-framerate', cfg.fps, '-i', ivid,
-               '-c:v', 'libx264', '-vf', f, '-crf', crf,
-               '-loglevel', 'error', '-stats', '-an', '-y', cfg.out_video_2]
+        ivid = cfg.out_video_orig
+        output = path.join(cfg.output_dir, cfg.out_video_filtered_orig)
+    cmd = ['ffmpeg', '-i', ivid, '-c:v', 'libx264', '-vf', filts, '-crf', crf,
+           '-c:a', 'copy', '-loglevel', 'error', '-stats', '-y', output]
+
+    print('\n', cmd, '\n')
+
     run(cmd)
 
 
-def show_graph(motions):
-    y_vals = []
-    for m in motions:
-        y_vals.append(m.x)
-    xx = np.arange(len(y_vals))
-    yy = np.array(y_vals)
-    #plt.plot(xx, yy)
-    plt.bar(xx, yy)
-    plt.show()
+def cleanup():
+    cfg = config.cfg
+
+    utils.delete_files_in_dir(cfg.frames_in)
+    utils.delete_files_in_dir(cfg.frames_projection_path)
+    utils.delete_files_in_dir(cfg.frames_stabilized)
+    utils.delete_files_in_dir(cfg.hugin_projects)
+    utils.delete_filepath(cfg.detect_show_video)

@@ -4,7 +4,7 @@ import math
 
 
 @dataclass
-class motion:
+class transform:
     x: float
     y: float
     roll: float
@@ -12,9 +12,9 @@ class motion:
 
 @dataclass
 class hugin_task:
-    roll: float
-    yaw: float
-    pitch: float
+    # roll: float
+    # yaw: float
+    # pitch: float
     img: str
     pto_file: str
 
