@@ -5,6 +5,7 @@ from subprocess import run, check_output, DEVNULL
 from math import radians as rads
 from math import degrees as degs
 import numpy as np
+import matplotlib.pyplot as plt
 import config
 from datatypes import *
 
@@ -42,12 +43,10 @@ def degs_to_pix(degrees):
     return round(degs_tan/tan_pix)
 
 
-def lens_shift():
-    cfg = config.cfg
-
-    inp_coords = '{} {}'.format(cfg.pto.orig_w/2+cfg.pto.lens_d,
-                                cfg.pto.orig_h/2+cfg.pto.lens_e)
-    ret = check_output(['pano_trafo', cfg.pto.filepath, '0'],
+def lens_shift(pto):
+    inp_coords = '{} {}'.format(pto.orig_w/2+pto.lens_d,
+                                pto.orig_h/2+pto.lens_e)
+    ret = check_output(['pano_trafo', pto.filepath, '0'],
                        input=inp_coords.encode('utf-8'))
     ret_coords = ret.strip().split()
     rectilinear_coords = (float(ret_coords[0]), float(ret_coords[1]))
@@ -65,15 +64,46 @@ def convert_relative_motions_to_absolute(motions_rel):
     return motions_abs
 
 
-def gauss_filter(motions):
+def convert_absolute_motions_to_relative(motions_abs):
+    '''Absolute motions to relative'''
+    motions_rel = []
+    motions_abs_r = motions_abs[:]
+    motions_abs_r.reverse()
+    currm = motions_abs_r[0] # last
+    for nextm in motions_abs_r[1:]:
+        motions_rel.append(sub_motions(currm, nextm))
+        currm = nextm
+    motions_rel.append(motion(0, 0, 0))
+    motions_rel.reverse()
+    return motions_rel
+
+
+def gauss_filter(motions, smooth_percent, graph=False):
     cfg = config.cfg
 
     motions_copy = motions.copy()
-    smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
+    smoothing = round((int(cfg.fps)/100)*int(smooth_percent))
     mu = smoothing
     s = mu*2+1
-    sigma2 = (mu/2.0)**2
+
+    sigma2 = (mu/2)**2
+    #sigma2 = (mu)**2
+
     kernel = np.exp(-(np.arange(s)-mu)**2/sigma2)
+    ## higher order Gauss function
+    #kernel = np.exp(-((np.arange(s)-mu)**2/sigma2)**2)
+
+    ## dev show Gauss kernel graph
+    if graph:
+        y_vals = []
+        for v in kernel:
+            y_vals.append(v)
+        xx = np.arange(len(y_vals))
+        yy = np.array(y_vals)
+        #plt.plot(xx, yy)
+        plt.bar(xx, yy)
+        plt.show()
+        exit()
 
     mlength = len(motions)
     for i in range(mlength):
@@ -93,11 +123,11 @@ def gauss_filter(motions):
     return motions
 
 
-def get_global_motions(from_dir):
+def get_global_motions(from_dir, filename='global_motions.trf'):
     cfg = config.cfg
 
     motions = []
-    f = open(path.join(from_dir, 'global_motions.trf'))
+    f = open(path.join(from_dir, filename))
     
     lines = f.read().splitlines()
     for line in lines:

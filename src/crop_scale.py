@@ -4,7 +4,7 @@ import config
 from utils import ff, delete_files_in_dir
 
 def crop_scale_output():
-    print('crop_scale_output()')
+    print('\n crop_scale_output() \n')
     cfg = config.cfg
     
     ivid = path.join(cfg.output_dir, 'output.mkv')
@@ -18,8 +18,8 @@ def crop_scale_output():
 
     crf = str(24)
     iaud = path.join(cfg.audio_dir, 'audio.ogg')
-    filts = 'crop={}:{},scale={}:{}'.format(min_cropw, min_croph, scalew, scaleh)
-    #filts = 'crop={}:{}'.format(min_cropw, min_croph)
+    #filts = 'crop={}:{},scale={}:{}'.format(min_cropw, min_croph, scalew, scaleh)
+    filts = 'crop={}:{}'.format(min_cropw, min_croph)
     
     if path.isfile(iaud):
         run(['ffmpeg', '-loglevel', 'error', '-stats',

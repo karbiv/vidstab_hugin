@@ -5,9 +5,9 @@ import signal
 from argparse import ArgumentParser, Action, RawTextHelpFormatter
 from os import path
 import config
-from inp_frames import *
-from vidstab import *
-from out_frames import *
+import inp_frames
+import vidstab
+import out_frames
 from crop_scale import *
 
 
@@ -35,7 +35,7 @@ class CreateProjectAction(Action):
         setattr(namespace, self.dest, path.abspath(value[0]))
 
 
-num_of_stages = 7
+num_of_stages = 10
 parser = ArgumentParser(description="Stabilize video.",
                         formatter_class=RawTextHelpFormatter)
 
@@ -65,37 +65,34 @@ if __name__ == '__main__':
 
     if args.stage == 0: # all stages
         ## start pipeline
-        input_frames_and_audio()
-        
-        libvidstab_detect()
-        libvidstab_transform()
-        libvidstab_detect_pass_2()
-        libvidstab_transform_pass_2()
-        libvidstab_detect_pass_3()
-        libvidstab_transform_pass_3()
-        libvidstab_detect_pass_4()
-        libvidstab_transform_pass_4()
-        combine_global_transforms()
-        
-        output_frames()
-        
-        output_video()
-        crop_scale_output()
+        inp_frames.input_frames_and_audio()
+        inp_frames.frames_projection()
+        inp_frames.create_video_for_vidstab()
+
+        vidstab.detect_1()
+        vidstab.transform_1()
+        out_frames.frames_1()
+        out_frames.out_video_1()
+
+        vidstab.detect_2()
+        vidstab.transform_2()
+        vidstab.combine_global_transforms()
+        out_frames.frames_2()
+        out_frames.out_video_2()
+
         ## end pipeline
     elif args.stage == 1:
-        input_frames_and_audio()
+        inp_frames.input_frames_and_audio()
+        inp_frames.frames_projection()
+        inp_frames.create_video_for_vidstab()
     elif args.stage == 2:
-        libvidstab_detect()
-        libvidstab_transform()
-        libvidstab_detect_pass_2()
-        libvidstab_transform_pass_2()
-        libvidstab_detect_pass_3()
-        libvidstab_transform_pass_3()
-        libvidstab_detect_pass_4()
-        libvidstab_transform_pass_4()
-        combine_global_transforms()
+        vidstab.detect_1()
+        vidstab.transform_1()
+        out_frames.frames_1()
+        out_frames.out_video_1()
     elif args.stage == 3:
-        output_frames()
-    elif args.stage == 4:
-        output_video()
-        crop_scale_output()
+        vidstab.detect_2()
+        vidstab.transform_2()
+        vidstab.combine_global_transforms()
+        out_frames.frames_2()
+        out_frames.out_video_2()

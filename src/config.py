@@ -14,23 +14,29 @@ class Configuration:
     hugin_projects: str = None
     frames_in: str = None
     frames_stabilized: str = None
+    frames_stabilized_2: str = None
+    frames_projection_path: str = None
     audio_dir: str = None
     vidstab_dir: str = None
-    vidstab_dir_pass_2: str = None
-    vidstab_dir_pass_3: str = None
-    vidstab_dir_pass_4: str = None
+    vidstab_dir_2: str = None
+    #full_input_frames: str = None
+    out_video_1: str = None
 
     ## files
-    combined_global_motions: str = None
     crops_file: str = None
     vidstab_hugin_ini: str = None
     rectilinear_pto: str = None
 
     pto: HuginPTO = None
+    first_stage_pto_path: str = None
+    stab_pto_path: str = None
 
     fps: str = None # FPS of input video, by ffprobe
     params: configparser.SectionProxy = None # params from vidstab_hugin.ini
     args: argparse.Namespace = None
+
+    current_pto_path = None
+    current_output_projection = None
 
 
     def __init__(self, args):
@@ -87,21 +93,40 @@ class Configuration:
         self.frames_in.mkdir(parents=True, exist_ok=True)
         self.frames_stabilized = Path(path.join(data_path, 'frames_stabilized'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
+        self.frames_projection_path = Path(path.join(data_path, 'frames_projection'))
+        self.frames_projection_path.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(data_path, 'audio'))
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.vidstab_dir = Path(path.join(data_path, 'vidstab'))
         self.vidstab_dir.mkdir(parents=True, exist_ok=True)
-        self.vidstab_dir_pass_2 = Path(path.join(data_path, 'vidstab_pass_2'))
-        self.vidstab_dir_pass_2.mkdir(parents=True, exist_ok=True)
-        self.vidstab_dir_pass_3 = Path(path.join(data_path, 'vidstab_pass_3'))
-        self.vidstab_dir_pass_3.mkdir(parents=True, exist_ok=True)
-        self.vidstab_dir_pass_4 = Path(path.join(data_path, 'vidstab_pass_4'))
-        self.vidstab_dir_pass_4.mkdir(parents=True, exist_ok=True)
+        self.vidstab_dir_2 = Path(path.join(data_path, 'vidstab_2'))
+        self.vidstab_dir_2.mkdir(parents=True, exist_ok=True)
+
         self.output_dir = Path(path.join(data_path, 'OUTPUT'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.crops_file = path.join(self.output_dir, 'crop_margins.txt')
-        self.combined_global_motions = path.join(self.output_dir, 'global_motions.trf')
+
+        self.first_stage_pto_path = path.join(self.output_dir, 'first_stage.pto')
+        self.stab_pto_path = path.join(self.output_dir, 'stab.pto')
+
+        self.frames_stabilized_2 = Path(path.join(data_path, 'frames_stabilized_2'))
+        self.frames_stabilized_2.mkdir(parents=True, exist_ok=True)
+
+        self.projection_pto_path = path.join(data_path, 'projection.pto')
+        self.frames_projection_video = path.join(self.vidstab_dir, 'projection.mkv')
+        self.out_video_1 = path.join(self.output_dir, 'out_video_1.mkv')
+        self.out_video_2 = path.join(self.output_dir, 'out_video_2.mkv')
+
+        self.out_1_pto_path = path.join(data_path, 'out_1.pto')
+        self.out_2_pto_path = path.join(data_path, 'out_2.pto')
+
+        ########
+        # self.vidstab_dir_3 = Path(path.join(data_path, 'vidstab_3'))
+        # self.vidstab_dir_3.mkdir(parents=True, exist_ok=True)
+        # self.frames_stabilized_3 = Path(path.join(data_path, 'frames_stabilized_3'))
+        # self.frames_stabilized_3.mkdir(parents=True, exist_ok=True)
+        # self.out_video_3 = path.join(self.output_dir, 'out_video_3.mkv')
 
 
 cfg: Configuration = None

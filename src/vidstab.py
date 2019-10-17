@@ -1,412 +1,181 @@
-from subprocess import run
 from os import path
+import sys
+from subprocess import run, DEVNULL, check_output
+import math
 import config
 import utils
 import datatypes
 
 
-filt_for_pass_2 = 'crop=floor(iw/2.1)*2:floor(ih/2.1)*2'
-filt_for_pass_3 = 'crop=floor(iw/2.2)*2:floor(ih/2.2)*2'
-filt_for_pass_4 = 'crop=floor(iw/2.5)*2:floor(ih/2.3)*2'
-
-# filt_for_pass_1 = 'scale=floor(iw/4)*2:floor(ih/4)*2'
-# filt_for_pass_2 = 'scale=floor(iw/2)*2:floor(ih/2)*2'
-
-## pixels step size for detect phase in libvidstab
-stepsize_pass_1 = 6
-stepsize_pass_2 = 4
-stepsize_pass_3 = 2
-stepsize_pass_4 = 2
-
-
-def libvidstab_detect():
-    print('\n libvidstab_detect() \n')
+def detect_1():
+    print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
     trf = 'transforms.trf'
-    inp = cfg.args.videofile
+    inp = cfg.frames_projection_video
 
-    step = 'stepsize='+str(stepsize_pass_1)
+    step = 'stepsize='+str(cfg.params['stepsize_pass_1'])
     mincontrast = float(cfg.params['motion_detection_mincontrast'])
 
+    #cropf = 'crop=floor((ih*1.777)/2)*2:floor(ih/2)*2,' # 16x9
+    cropf = 'crop=floor((ih*1.333)/2)*2:floor(ih/2)*2,' # 4x3
+    #cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2,'
     detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=2'
-    detect = detect.format(step, mincontrast, trf)
-    filts = detect
+    filts = cropf+detect.format(step, mincontrast, trf)
 
-    cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-           '-i', inp, '-vf', filts, '-an', '-f', 'null', '-']
+    # cmd = ['ffmpeg', '-i', inp, '-vf', filts, '-an', '-f', 'null',
+    #        '-loglevel', 'error', '-stats', '-']
+    cmd = ['ffmpeg', '-i', inp, '-vf', filts, '-an', '-y',
+           '-loglevel', 'error', '-stats', '-c:v', 'libx264', '-crf', '24','show.mkv']
     print(' '.join(cmd))
     run(cmd, cwd=cfg.vidstab_dir)
 
 
-def libvidstab_transform():
-    print('\n libvidstab_transform() \n')
+def transform_1():
+    print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
     trf = 'transforms.trf'
-    inp = cfg.args.videofile
+    inp = cfg.frames_projection_video
     out = path.join(cfg.vidstab_dir, 'stabilized.mkv')
 
     crf = '16'
-    smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
+    smoothing_percent = int(cfg.params['smoothing_1'])
+    smoothing = round((int(cfg.fps)/100)*smoothing_percent)
     sm = 'smoothing={0}:relative=1'.format(smoothing)
     f1 = 'format=yuv444p'
-    f2 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
+    f2 = 'vidstabtransform=debug=1:input={0}:interpol=bicubic:{1}:optzoom=0:crop=black'.format(trf, sm)
 
-    f = "{},{},{}".format(filt_for_pass_2, f1, f2)
-    run(['ffmpeg', '-loglevel', 'error', '-stats',
-         '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-        cwd=cfg.vidstab_dir)
+    # frame_scale = float(cfg.params['first_stage_frame_scale'])
+    # divider = round(float((1/frame_scale)*2), 4)
+    cropf = 'crop=floor((ih*1.333)/2)*2:floor(ih/2)*2' # 4x3
+    #cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
+
+    f = "{},{},{}".format(cropf, f1, f2)
+
+    #duration = '00:00:00.250'
+    cmd = ['ffmpeg', '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf,
+           #'-t', duration,
+           '-an', '-y', '-loglevel', 'error', '-stats', out]
+    print(' '.join(cmd))
+    run(cmd, cwd=cfg.vidstab_dir)
 
 
-def libvidstab_detect_pass_2():
-    print('\n libvidstab_detect_pass_2() \n')
+def detect_2():
+    print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
     trf = 'transforms.trf'
-    inp = path.join(cfg.vidstab_dir, 'stabilized.mkv')
+    inp = cfg.out_video_1
 
-    step = 'stepsize='+str(stepsize_pass_2)
+    step = 'stepsize='+str(cfg.params['stepsize_pass_1'])
     mincontrast = float(cfg.params['motion_detection_mincontrast'])
 
-    detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}'
+    cropf = 'crop=floor((ih*1.333)/2)*2:floor(ih/2)*2,' # 4x3
+    #cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2,'
+    detect = cropf+'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=2'
     filts = detect.format(step, mincontrast, trf)
 
-    cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-           '-i', inp, '-vf', filts, '-f', 'null', '-']
+    # cmd = ['ffmpeg', '-i', inp, '-vf', filts, '-an', '-f', 'null',
+    #        '-loglevel', 'error', '-stats', '-']
+    cmd = ['ffmpeg', '-i', inp, '-vf', filts, '-an', '-y',
+           '-loglevel', 'error', '-stats', '-c:v', 'libx264', '-crf', '24', 'show.mkv']
     print(' '.join(cmd))
-    run(cmd, cwd=cfg.vidstab_dir_pass_2)
+    run(cmd, cwd=cfg.vidstab_dir_2)
 
 
-def libvidstab_transform_pass_2():
-    print('\n libvidstab_transform_pass_2() \n')
+def transform_2():
+    print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
     trf = 'transforms.trf'
-    inp = path.join(cfg.vidstab_dir, 'stabilized.mkv')
-    out = path.join(cfg.vidstab_dir_pass_2, 'stabilized.mkv')
+    inp = cfg.out_video_1
+    out = path.join(cfg.vidstab_dir_2, 'stabilized.mkv')
 
     crf = '16'
-    smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
+    smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing_2']))
     sm = 'smoothing={0}:relative=1'.format(smoothing)
-    f1 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-    f2 = 'format=yuv444p'
+    f1 = 'format=yuv444p'
+    f2 = 'vidstabtransform=debug=1:input={0}:interpol=bicubic:{1}:optzoom=0:crop=black'.format(trf, sm)
 
-    time = '00:00:00.150'
-    f = "{},{},{}".format(filt_for_pass_3, f1, f2)
-    run(['ffmpeg', '-loglevel', 'error', '-stats',
-         '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-        cwd=cfg.vidstab_dir_pass_2)
+    cropf = 'crop=floor((ih*1.333)/2)*2:floor(ih/2)*2' # 4x3
+    f = "{},{},{}".format(cropf, f1, f2)
 
-    run(['ffmpeg', '-loglevel', 'error', '-stats',
-         '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-        cwd=cfg.vidstab_dir_pass_2)
-
-
-def libvidstab_detect_pass_3():
-    print('\n libvidstab_detect_pass_3() \n')
-    cfg = config.cfg
-
-    trf = 'transforms.trf'
-    inp = path.join(cfg.vidstab_dir_pass_2, 'stabilized.mkv')
-
-    step = 'stepsize='+str(stepsize_pass_3)
-    mincontrast = float(cfg.params['motion_detection_mincontrast'])
-
-    detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}'
-    filts = detect.format(step, mincontrast, trf)
-
-    cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-           '-i', inp, '-vf', filts, '-f', 'null', '-']
+    #duration = '00:00:00.250'
+    cmd = ['ffmpeg', '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf,
+           #'-t', duration,
+           '-an', '-y', '-loglevel', 'error', '-stats', out]
     print(' '.join(cmd))
-    run(cmd, cwd=cfg.vidstab_dir_pass_3)
-
-
-def libvidstab_transform_pass_3():
-    print('\n libvidstab_transform_pass_3() \n')
-    cfg = config.cfg
-
-    trf = 'transforms.trf'
-    inp = path.join(cfg.vidstab_dir_pass_2, 'stabilized.mkv')
-    out = path.join(cfg.vidstab_dir_pass_3, 'stabilized.mkv')
-
-    crf = '16'
-    smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-    sm = 'smoothing={0}:relative=1'.format(smoothing)
-    f1 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-    f2 = 'format=yuv444p'
-
-    f = "{},{}".format(f1, f2)
-
-    #time = '00:00:00.150'
-    # run(['ffmpeg', '-loglevel', 'error', '-stats',
-    #      '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-    #     cwd=cfg.vidstab_dir_pass_3)
-
-    run(['ffmpeg', '-loglevel', 'error', '-stats',
-         '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-        cwd=cfg.vidstab_dir_pass_3)
-
-
-def libvidstab_detect_pass_4():
-    print('\n libvidstab_detect_pass_4() \n')
-    cfg = config.cfg
-
-    trf = 'transforms.trf'
-    inp = path.join(cfg.vidstab_dir_pass_3, 'stabilized.mkv')
-
-    step = 'stepsize='+str(stepsize_pass_4)
-    mincontrast = float(cfg.params['motion_detection_mincontrast'])
-
-    detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}'
-    filts = detect.format(step, mincontrast, trf)
-
-    cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-           '-i', inp, '-vf', filts, '-f', 'null', '-']
-    print(' '.join(cmd))
-    run(cmd, cwd=cfg.vidstab_dir_pass_4)
-
-
-def libvidstab_transform_pass_4():
-    print('\n libvidstab_transform_pass_4() \n')
-    cfg = config.cfg
-
-    trf = 'transforms.trf'
-    inp = path.join(cfg.vidstab_dir_pass_3, 'stabilized.mkv')
-    out = path.join(cfg.vidstab_dir_pass_4, 'stabilized.mkv')
-
-    crf = '24'
-    smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-    sm = 'smoothing={0}:relative=1'.format(smoothing)
-    f1 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-    f2 = 'format=yuv444p'
-
-    time = '00:00:00.150'
-    f = "{},{}".format(f1, f2)
-    run(['ffmpeg', '-loglevel', 'error', '-stats',
-         '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-        cwd=cfg.vidstab_dir_pass_4)
+    run(cmd, cwd=cfg.vidstab_dir_2)
 
 
 def combine_global_transforms():
-    print('\n combine_global_transforms() \n')
+    print('\n {} \n'.format(sys._getframe().f_code.co_name))
     cfg = config.cfg
 
-    first_pass_rel = utils.get_global_motions(cfg.vidstab_dir)
-    second_pass_rel = utils.get_global_motions(cfg.vidstab_dir_pass_2)
-    third_pass_rel = utils.get_global_motions(cfg.vidstab_dir_pass_3)
-    forth_pass_rel = utils.get_global_motions(cfg.vidstab_dir_pass_4)
+    ## get first vidstab stage camera rotations
+    f = open(path.join(cfg.output_dir, 'rotations_1.txt'))
+    lines = f.read().splitlines()
+    rotations_1 = []
+    for l in lines:
+        rotations_1.append((l.strip().split()))
 
-    combined = []
-    for (a, b, c, d) in zip(first_pass_rel, second_pass_rel, third_pass_rel, forth_pass_rel):
-        combined.append(datatypes.motion(a.x+b.x+c.x+d.x, a.y+b.y+c.y+d.y,
-                                         a.roll+b.roll))
+    # first_rel = utils.get_global_motions(cfg.vidstab_dir)
+    # # first_abs_filtered = utils.gauss_filter(utils.convert_relative_motions_to_absolute(first_rel),
+    # #                                         cfg.params['smoothing_1'])
+        
+    second_rel = utils.get_global_motions(cfg.vidstab_dir_2)
+    second_abs_filtered = utils.gauss_filter(utils.convert_relative_motions_to_absolute(second_rel),
+                                             cfg.params['smoothing_2'])
 
-    combined = utils.gauss_filter(utils.convert_relative_motions_to_absolute(combined))
+    # combined_rel = []
+    # for a, b in zip(first_rel, second_rel):
+    #     combined_rel.append(datatypes.motion(a.x+b.x, a.y+b.y, a.roll+b.roll))
+    # combined_abs_filtered = utils.gauss_filter(utils.convert_relative_motions_to_absolute(combined_rel),
+    #                                            cfg.params['smoothing_2'])
 
-    f = open(cfg.combined_global_motions, 'a')
-    f.seek(0)
-    f.truncate()
-    for cm in combined:
-        f.write('0 {} {} {}\n'.format(cm.x, cm.y, cm.roll))
+    pto_projection = datatypes.HuginPTO(cfg.out_1_pto_path)
+    horizont_tan = math.tan(math.radians(cfg.pto.canv_half_hfov))
+    tan_pix = horizont_tan/(cfg.pto.canvas_w/2)
+    combined_rotations = []
+
+    #for i, m in enumerate(first_rel):
+    for i, rot in enumerate(rotations_1):
+        x, y, roll = second_abs_filtered[i].__dict__.values()
+        #x, y, roll = combined_abs_filtered[i].__dict__.values()
+
+        roll = 0-math.degrees(roll)
+
+        ## get original coords from projection
+        _coords = '{} {}'.format(pto_projection.canvas_w/2+x, pto_projection.canvas_h/2-y)
+        orig_coords = check_output(['pano_trafo', '-r', cfg.out_1_pto_path, '0'],
+                                   input=_coords.encode('utf-8')).strip().split()
+        ox, oy = float(orig_coords[0]), float(orig_coords[1])
+
+        ## get rectilinear projection coords from original
+        _coords = '{} {}'.format(ox, oy)
+        rectil_coords = check_output(['pano_trafo', cfg.pto.filepath, '0'],
+                                     input=_coords.encode('utf-8')).strip().split()
+
+        rx, ry = float(rectil_coords[0]), float(rectil_coords[1])
+        x, y = rx-(cfg.pto.canvas_w/2), (cfg.pto.canvas_h/2)-ry
+
+        yaw_rads = math.atan(x*tan_pix)
+        yaw = math.degrees(yaw_rads)
+
+        pitch_rads = math.atan(y*tan_pix)
+        pitch = 0-math.degrees(pitch_rads)
+
+        roll = float(rot[0]) + roll
+        yaw = float(rot[1]) + yaw
+        pitch = float(rot[2]) + pitch
+
+        combined_rotations.append((roll, yaw, pitch))
+        print('Combined camera rotations for frame {}: yaw {}, pitch {}'.format(i, yaw, pitch))
+
+    motions_filepath = path.join(cfg.output_dir, 'combined_rotations.txt')
+    utils.delete_filepath(motions_filepath)
+    f = open(motions_filepath, 'w')
+    for cm in combined_rotations:
+        f.write('{} {} {}\n'.format(cm[0], cm[1], cm[2]))
     f.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def libvidstab_detect():
-#     print('libvidstab_detect()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     #inp = cfg.args.videofile
-#     inp = path.join(cfg.vidstab_dir, 'tostabilize.mkv')
-
-#     step = 'stepsize=3'
-#     mincontrast = float(cfg.params['motion_detection_mincontrast'])
-
-#     crop = 'crop=(floor(iw/3))*2:floor(ih/2)*2,'
-#     detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=2'
-#     detect = detect.format(step, mincontrast, trf)
-#     filts = crop+detect
-
-#     crf = '21'
-#     cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-#            '-i', inp, '-vf', filts, '-c:v', 'libx264', '-crf', crf, '-an', '-y', 'show.mkv']
-#     print(' '.join(cmd))
-#     run(cmd, cwd=cfg.vidstab_dir)
-
-
-# def libvidstab_transform():
-#     print('libvidstab_transform()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir, 'tostabilize.mkv')
-#     out = path.join(cfg.vidstab_dir, 'stabilized.mkv')
-
-#     crf = '16'
-#     smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-#     sm = 'smoothing={0}:relative=1'.format(smoothing)
-#     f1 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-#     f2 = 'format=yuv444p'
-
-#     f = "crop=((floor(iw/5))*2):(floor(ih/3))*2,{0},{1}".format(f1, f2)
-#     run(['ffmpeg', '-loglevel', 'error', '-stats',
-#          '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-#         cwd=cfg.vidstab_dir)
-
-
-# def libvidstab_detect_pass_2():
-#     print('libvidstab_detect_pass_2')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir, 'stabilized.mkv')
-
-#     step = 'stepsize=1'
-#     mincontrast = float(cfg.params['motion_detection_mincontrast'])
-
-#     detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}'
-#     filts = detect.format(step, mincontrast, trf)
-
-#     cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-#            '-i', inp, '-vf', filts, '-f', 'null', '-']
-#     print(' '.join(cmd))
-#     run(cmd, cwd=cfg.vidstab_dir_pass_2)
-
-
-# def libvidstab_transform_pass_2():
-#     print('libvidstab_transform_pass_2()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir, 'stabilized.mkv')
-#     out = path.join(cfg.vidstab_dir_pass_2, 'stabilized.mkv')
-
-#     crf = '21'
-#     smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-#     sm = 'smoothing={0}:relative=1'.format(smoothing)
-#     f1 = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-#     f2 = 'format=yuv444p'
-
-#     time = '00:00:00.150'
-
-#     f = "{0},{1}".format(f1, f2)
-#     run(['ffmpeg', '-loglevel', 'error', '-stats',
-#          '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-#         cwd=cfg.vidstab_dir_pass_2)
-
-
-# ## for rotation
-# def libvidstab_detect_pass_3():
-#     print('libvidstab_detect_pass_3()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir, 'tostabilize.mkv')
-
-#     step = 'stepsize=4'
-#     mincontrast = float(cfg.params['motion_detection_mincontrast'])
-
-#     #crop = 'crop=((floor(iw/2))*2):(floor(ih/2))*2,'
-#     #scale = 'scale=floor(iw/1.7):(floor(ih/1.7)),'
-#     detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}'
-#     filts = detect.format(step, mincontrast, trf)
-
-#     cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-#            '-i', inp, '-vf', filts, '-f', 'null', '-']
-#     print(' '.join(cmd))
-#     run(cmd, cwd=cfg.vidstab_dir_pass_3)
-
-
-# def libvidstab_transform_pass_3():
-#     print('libvidstab_transform_pass_3()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir, 'tostabilize.mkv')
-#     out = path.join(cfg.vidstab_dir_pass_3, 'stabilized.mkv')
-
-#     crf = '16'
-#     smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-#     sm = 'smoothing={0}:relative=1'.format(smoothing)
-#     #scale = 'scale=floor(iw/1.5):(floor(ih/1.5)),'
-#     f = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-
-#     run(['ffmpeg', '-loglevel', 'error', '-stats',
-#          '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-#         cwd=cfg.vidstab_dir_pass_3)
-
-
-# def libvidstab_detect_pass_4():
-#     print('libvidstab_detect_pass_4()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir_pass_3, 'stabilized.mkv')
-
-#     step = 'stepsize=4'
-#     mincontrast = float(cfg.params['motion_detection_mincontrast'])
-
-#     detect = 'format=yuv444p,vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}'
-#     filts = detect.format(step, mincontrast, trf)
-
-#     cmd = ['ffmpeg', '-loglevel', 'error', '-stats',
-#            '-i', inp, '-vf', filts, '-f', 'null', '-']
-#     print(' '.join(cmd))
-#     run(cmd, cwd=cfg.vidstab_dir_pass_4)
-
-
-# def libvidstab_transform_pass_4():
-#     print('libvidstab_transform_pass_4()')
-#     cfg = config.cfg
-
-#     trf = 'transforms.trf'
-#     inp = path.join(cfg.vidstab_dir_pass_3, 'stabilized.mkv')
-#     out = path.join(cfg.vidstab_dir_pass_4, 'stabilized.mkv')
-
-#     crf = '16'
-#     smoothing = round((int(cfg.fps)/100)*int(cfg.params['smoothing']))
-#     sm = 'smoothing={0}:relative=1'.format(smoothing)
-#     f = 'vidstabtransform=debug=1:input={0}:interpol=linear:{1}:optzoom=0:crop=black'.format(trf, sm)
-
-#     time = '00:00:00.150'
-
-#     run(['ffmpeg', '-loglevel', 'error', '-stats',
-#          '-t', time, '-i', inp, '-vf', f, '-c:v', 'libx264', '-crf', crf, '-an', '-y', out],
-#         cwd=cfg.vidstab_dir_pass_4)
-
-
-# def combine_global_transforms():
-#     print('combine_global_transforms()')
-#     cfg = config.cfg
-
-#     first_pass_rel = utils.get_global_motions(cfg.vidstab_dir)
-#     second_pass_rel = utils.get_global_motions(cfg.vidstab_dir_pass_2)
-#     third_pass_rel = utils.get_global_motions(cfg.vidstab_dir_pass_3)
-#     forth_pass_rel = utils.get_global_motions(cfg.vidstab_dir_pass_4)
-
-#     combined = []
-#     # for (a, b, c) in zip(first_pass_rel, second_pass_rel, third_pass_rel):
-#     #     combined.append(datatypes.motion(a.x+b.x, a.y+b.y, c.roll))
-#     for (a, b, c, d) in zip(first_pass_rel, second_pass_rel, third_pass_rel, forth_pass_rel):
-#         combined.append(datatypes.motion(a.x+b.x, a.y+b.y, c.roll+d.roll))
-
-#     combined = utils.gauss_filter(utils.convert_relative_motions_to_absolute(combined))
-
-#     f = open(cfg.combined_global_motions, 'a')
-#     f.seek(0)
-#     f.truncate()
-#     for cm in combined:
-#         f.write('0 {} {} {}\n'.format(cm.x, cm.y, cm.roll))
-#     f.close()

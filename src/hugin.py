@@ -19,42 +19,77 @@ frame_crop_heights = None
 frames_crop_q: Queue = None
 
 
-def frames_output(task):
-    '''pto is a file extension of Hugin project files'''
+# def frames_projection(task):
+#     cfg = config.cfg
+
+#     out_img = path.join(cfg.current_output_path, task.img)
+#     task_pto = path.join(cfg.hugin_projects, task.pto_file)
+#     run(['pto_gen', '-o', task_pto, path.join(cfg.frames_in, task.img)],
+#         stderr=DEVNULL, # supress msg about failed reading of EXIF data
+#         stdout=DEVNULL)
+#     run(['pto_template', '-o', task_pto, '--template='+cfg.current_pto_path, task_pto],
+#         stdout=DEVNULL)
+
+#     print('Frame: {}'.format(out_img))
+
+#     run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '95', '-o', out_img, task_pto],
+#         stdout=DEVNULL)
+
+#     delete_filepath(task_pto)
+
+
+def frames_projection(task):
     cfg = config.cfg
 
-    out_img = path.join(cfg.frames_stabilized, task.img)
+    out_img = path.join(cfg.current_output_path, task.img)
     task_pto = path.join(cfg.hugin_projects, task.pto_file)
     run(['pto_gen', '-o', task_pto, path.join(cfg.frames_in, task.img)],
         stderr=DEVNULL, # supress msg about failed reading of EXIF data
         stdout=DEVNULL)
-    run(['pto_template', '-o', task_pto, '--template='+cfg.pto.filepath, task_pto],
+    run(['pto_template', '-o', task_pto, '--template='+cfg.current_pto_path, task_pto],
         stdout=DEVNULL)
 
-    ## set projection
-    run(['pano_modify', '--output='+task_pto, '--crop=AUTO',
-         '--projection='+str(cfg.params['output_projection']), task_pto],
+    print('Frame: {}'.format(out_img))
+
+    run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '95', '-o', out_img, task_pto],
+        stdout=DEVNULL)
+
+    delete_filepath(task_pto)
+
+
+def frames_output(task):
+    '''Used by multiprocessing.Pool'''
+    cfg = config.cfg
+    pto_path = cfg.current_pto_path
+
+    out_img = path.join(cfg.current_output_path, task.img)
+    task_pto_name = path.join(cfg.hugin_projects, task.pto_file)
+    run(['pto_gen', '-o', task_pto_name, path.join(cfg.frames_in, task.img)],
+        stderr=DEVNULL, # supress msg about failed reading of EXIF data
+        stdout=DEVNULL)
+    run(['pto_template', '-o', task_pto_name, '--template='+pto_path, task_pto_name],
         stdout=DEVNULL)
 
     ## camera Euler rotations
     ## interpolation index 0 is bicubic
-    run(['pano_modify', '--output='+task_pto,
-         '--rotate={0},{1},{2}'.format(task.yaw, task.pitch, task.roll), task_pto],
-        stdout=DEVNULL)
+    run(['pano_modify', '--output='+task_pto_name,
+         '--rotate={0},{1},{2}'.format(task.yaw, task.pitch, task.roll), task_pto_name],
+        stdout=DEVNULL
+    )
 
-    print('Frame: ', out_img)
+    print('Frame: {}'.format(out_img))
 
-    ## '-g' option, GPU, for Nona to be able to run in parallel in processes
-    run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '95', '-o', out_img, task_pto],
+    run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '95', '-o', out_img, task_pto_name],
         stdout=DEVNULL)
 
     ## Apply crop to a pto
-    run(['pano_modify', '-o', task_pto, '--crop=AUTO', task_pto], stdout=DEVNULL)
-    tmp_hugp = HuginPTO(task_pto)
-    frames_crop_q.put((tmp_hugp.crop_l, tmp_hugp.crop_r,
-                       tmp_hugp.crop_t, tmp_hugp.crop_b), True)
+    run(['pano_modify', '-o', task_pto_name, '--crop=AUTO', task_pto_name], stdout=DEVNULL)
+    if frames_crop_q:
+        tmp_hugp = HuginPTO(task_pto_name)
+        frames_crop_q.put((tmp_hugp.crop_l, tmp_hugp.crop_r,
+                           tmp_hugp.crop_t, tmp_hugp.crop_b), True)
 
-    delete_filepath(task_pto)
+    delete_filepath(task_pto_name)
 
 
 def collect_frame_crop_data(crop_queue, base_pto):
