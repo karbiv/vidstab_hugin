@@ -18,7 +18,8 @@ def frames_output(task):
     out_img = path.join(cfg.current_output_path, task.img)
     task_pto_name = path.join(cfg.hugin_projects, task.pto_file)
     
-    run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '99', '-o', out_img, task_pto_name], stdout=DEVNULL)
+    #run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '99', '-o', out_img, task_pto_name], stdout=DEVNULL)
+    run(['nona', '-g', '-i', '0', '-m', 'PNG', '-r', 'ldr', '-o', out_img, task_pto_name], stdout=DEVNULL)
 
     print('Frame: {}'.format(out_img))
     if frames_crop_q:
@@ -55,20 +56,22 @@ def collect_frame_crop_data(crop_queue, base_pto):
             f.write('{0} {1}\n'.format(crop_w, crop_h))
 
 
-def frames_projection(task):
-    cfg = config.cfg
+# def frames_projection(task):
+#     cfg = config.cfg
 
-    out_img = path.join(cfg.current_output_path, task.img)
-    task_pto = path.join(cfg.hugin_projects, task.pto_file)
-    run(['pto_gen', '-o', task_pto, path.join(cfg.frames_in, task.img)],
-        stderr=DEVNULL, # supress msg about failed reading of EXIF data
-        stdout=DEVNULL)
-    run(['pto_template', '-o', task_pto, '--template='+cfg.current_pto_path, task_pto],
-        stdout=DEVNULL)
+#     out_img = path.join(cfg.current_output_path, task.img)
+#     task_pto = path.join(cfg.hugin_projects, task.pto_file)
+#     run(['pto_gen', '-o', task_pto, path.join(cfg.frames_input, task.img)],
+#         stderr=DEVNULL, # supress msg about failed reading of EXIF data
+#         stdout=DEVNULL)
+#     run(['pto_template', '-o', task_pto, '--template='+cfg.current_pto_path, task_pto],
+#         stdout=DEVNULL)
 
-    print('Frame: {}'.format(out_img))
+#     print('Frame: {}'.format(out_img))
 
-    run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '99', '-o', out_img, task_pto],
-        stdout=DEVNULL)
+#     # run(['nona', '-g', '-i', '0', '-m', 'JPEG', '-r', 'ldr', '-z', '99', '-o', out_img, task_pto],
+#     #     stdout=DEVNULL)
+#     run(['nona', '-g', '-i', '0', '-m', 'PNG', '-r', 'ldr', '-o', out_img, task_pto],
+#         stdout=DEVNULL)
 
-    utils.delete_filepath(task_pto)
+#     utils.delete_filepath(task_pto)

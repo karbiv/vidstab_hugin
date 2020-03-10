@@ -12,9 +12,6 @@ class transform:
 
 @dataclass
 class hugin_task:
-    # roll: float
-    # yaw: float
-    # pitch: float
     img: str
     pto_file: str
 
@@ -92,6 +89,7 @@ class HuginPTO:
                             self.lens_d = float(p[1:])
                         if p.startswith('e'):
                             self.lens_e = float(p[1:])
+                first_image_found = True
 
         self.unpack_crop(crop_list)
         f.close()

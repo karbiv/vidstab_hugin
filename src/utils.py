@@ -4,7 +4,7 @@ import math
 from subprocess import run, check_output, DEVNULL
 from math import radians as rads
 from math import degrees as degs
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import config
 import datatypes
 

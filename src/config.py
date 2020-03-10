@@ -1,3 +1,4 @@
+import os
 from os import path
 import re
 from pathlib import Path
@@ -9,15 +10,13 @@ import utils
 
 class Configuration:
 
-    def __init__(self, args):
+    hugin_project_dirname = 'hugin_pto'
+    renders_dirname = 'renders'
 
-        if not path.isdir(args.project):
-            print('\nNot a directory: {}'.format(args.project))
-            print('Should be a directory containing vidstab_hugin.ini and rectilinear.pto(Hugin project)')
-            print('Output subdirs will be created in that dir.\n')
-            exit()
-        else:
-            args.project = path.abspath(args.project)
+    def __init__(self, parser):
+
+        args = parser.parse_args()
+        args.project = os.getcwd()
 
         self.vidstab_hugin_ini = path.join(path.abspath(args.project), 'vidstab_hugin.ini')
         if not path.isfile(self.vidstab_hugin_ini):
@@ -25,13 +24,18 @@ class Configuration:
             print('A template vidstab_hugin.ini in can be created using "-cp"(--create-project) option\n')
             exit()
 
-        self.project_pto = path.join(path.abspath(args.project), 'project.pto')
-        if not path.isfile(self.project_pto):
-            print('\nrectilinear.pto doesn\'t exist: {}'.format(self.project_pto))
-            print('Should be a Hugin project with rectilinear projection.\n')
-            exit()
+        self.project_pto = path.join(path.abspath(args.project), self.hugin_project_dirname, 'project.pto')
+        ## TODO autogeneration
+        # if not path.isfile(self.project_pto):
+        #     print('\nrectilinear.pto doesn\'t exist: {}'.format(self.project_pto))
+        #     print('Should be a Hugin project with rectilinear projection.\n')
+        #     exit()
 
-        if not path.isfile(args.videofile):
+        if not args.videofile:
+            print('PROBLEM: videofile argument is missing'); print()
+            parser.print_help()
+            exit()
+        elif not path.isfile(args.videofile):
             print('\nFilepath doesn\'t exist: {}\n'.format(args.videofile)); exit()
         else:
             self.fps = str(round(utils.get_fps(args.videofile)))
@@ -45,15 +49,15 @@ class Configuration:
 
         ## create output video subdir tree
         ##
-        data_dir_name = re.sub(r'[/\\]+', '_', args.videofile).strip('_')
-        data_dir = path.join(path.abspath(args.project), data_dir_name)
+        data_dir_name = re.sub(r'[/\\.]+', '_', args.videofile).strip('_')
+        data_dir = path.join(path.abspath(args.project), self.renders_dirname, data_dir_name)
         data_path = Path(data_dir)
         self.datapath = data_path
 
         self.hugin_projects = Path(path.join(data_path, 'hugin_projects'))
         self.hugin_projects.mkdir(parents=True, exist_ok=True)
-        self.frames_in = Path(path.join(data_path, 'frames_in'))
-        self.frames_in.mkdir(parents=True, exist_ok=True)
+        self.frames_input = Path(path.join(data_path, 'frames_input'))
+        self.frames_input.mkdir(parents=True, exist_ok=True)
         self.frames_stabilized = Path(path.join(data_path, 'frames_stabilized'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(data_path, 'audio'))
@@ -63,20 +67,26 @@ class Configuration:
         self.vidstab_orig_dir = Path(path.join(data_path, 'vidstab_orig'))
         self.vidstab_orig_dir.mkdir(parents=True, exist_ok=True)
 
-        self.output_dir = Path(path.join(data_path, 'OUTPUT'))
+        self.output_dir = Path(path.join(data_path, 'output'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.out_video = path.join(self.output_dir, 'out_video.mkv')
-        self.out_video_orig = path.join(self.output_dir, 'out_video_no_input_projection.mkv')
-        self.out_video_filtered = path.join(self.output_dir, 'filtered.mkv')
-        self.out_video_filtered_orig = path.join(self.output_dir, 'filtered_no_input_projection.mkv')
         self.crops_file = path.join(self.output_dir, 'crop_margins.txt')
 
+        self.out_video = path.join(self.output_dir, 'out_video_input_projection.mkv')
+        self.out_video_orig = path.join(self.output_dir, 'out_video.mkv')
+        self.out_video_filtered = path.join(self.output_dir, 'filtered_input_projection.mkv')
+        self.out_video_filtered_orig = path.join(self.output_dir, 'filtered.mkv')
+
         self.projection_pto_path = path.join(data_path, 'projection.pto')
+        self.projection_pto_tmpl_path = path.join(self.hugin_projects, 'projection_tmpl.pto')
         self.rectilinear_pto_path = path.join(data_path, 'rectilinear.pto')
         self.input_video = path.join(self.vidstab_dir, "input.mkv")
+        self.processed_video = path.join(self.vidstab_orig_dir, "input_processed.mkv")
 
         self.frames_projection = Path(path.join(data_path, 'frames_projection'))
         self.frames_projection.mkdir(parents=True, exist_ok=True)
+
+        self.frames_input_processed = Path(path.join(data_path, 'frames_input_processed'))
+        self.frames_input_processed.mkdir(parents=True, exist_ok=True)
 
 
 cfg: Configuration = None

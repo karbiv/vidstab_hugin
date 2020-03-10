@@ -1,3 +1,4 @@
 #!/usr/bin/sh
 
-python ./src/main.py $@
+BASEDIR=$(dirname "$0")
+python $BASEDIR/src/main.py $@
