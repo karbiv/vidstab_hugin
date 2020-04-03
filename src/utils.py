@@ -1,12 +1,77 @@
 import os
 from os import path
 import math
+import re
 from subprocess import run, check_output, DEVNULL
 from math import radians as rads
 from math import degrees as degs
-#import matplotlib.pyplot as plt
 import config
 import datatypes
+
+
+def create_pto_txt_one_image(pto_path):
+    cfg = config.cfg
+    pto_txt = ''
+    first_img_found = False
+    with open(pto_path, 'r') as proj_pto:
+        for line in proj_pto:
+            if line.startswith('#') or not line.strip():
+                continue
+            if line.startswith('i') and not first_img_found:
+                pto_txt += line
+                first_img_found = True
+            elif not line.startswith('i'):
+                pto_txt += line
+    return pto_txt
+
+
+def create_vidstab_projection_pto_file(pto_path):
+    '''
+    Hugin projections:
+    0   rectilinear
+    1   cylindrical
+    2   equirectangular
+    3   fisheye (equidistant)
+    4   stereographic
+    5   mercator
+    6   trans mercator
+    7   sinusoidal
+    8   lambert cylindrical equal area
+    9   lambert equal area azimuthal
+    10  albers equal area conic
+    11  miller cylindrical
+    12  panini
+    13  architectural
+    14  orthographic
+    15  equisolid
+    16  equirectangular panini
+    17  biplane
+    18  triplane
+    19  panini general
+    20  thoby
+    21  hammer-aitoff equal area
+    '''
+    cfg = config.cfg
+    pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
+    with open(pto_path, 'w') as f:
+        f.write(pto_txt)
+    projection = cfg.params['vidstab_projection']
+    run(['pano_modify', '-o', pto_path,
+         #'--canvas={}x{}'.format(cfg.pto.canvas_w*3, cfg.pto.canvas_h*3),
+         '--crop=AUTO', pto_path, '--projection='+str(projection) ], stdout=DEVNULL)
+
+
+def create_rectilinear_pto():
+    '''rectilinear pto to calculate camera rotations'''
+    cfg = config.cfg
+    pto_path = cfg.rectilinear_pto_path
+    pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
+    ## change to rectilinear projection
+    pto_txt = re.sub(r'p f[^\n\t ]+', 'p f0 ', pto_txt)
+    with open(pto_path, 'w') as f:
+        f.write(pto_txt)
+
+    return datatypes.HuginPTO(pto_path)
 
 
 def delete_files_in_dir(dir_path):
@@ -77,7 +142,7 @@ def mult_transforms(t, s):
 
 def get_fps(filepath):
     ''' ffprobe -v 0 -of csv=p=0 -select_streams v:0 -show_entries stream=r_frame_rate infile '''
-    
+
     out = check_output(['ffprobe', '-v', '0', '-of', 'csv=p=0', '-select_streams', 'v:0',
                         '-show_entries', 'stream=r_frame_rate', filepath])
     out = out.strip().split(b'/')

@@ -1,6 +1,5 @@
 ### Video stabilization using "Hugin Panorama Stitcher" and "libvidstab"(ffmpeg)
 
-import sys
 import signal
 from argparse import ArgumentParser, Action, RawTextHelpFormatter
 from os import path
@@ -27,7 +26,8 @@ class VideoFileAction(Action):
 num_of_stages = 5
 num_of_projections = 21 # Hugin projections
 max_cpus = 16
-max_smoothing = 200
+max_smoothing = 128
+default_smoothing_percent_of_fps = 73
 
 num_cpus_default = 7
 
@@ -41,80 +41,85 @@ parser.add_argument('videofile', type=str, nargs=1,
 parser.add_argument('-s', '--stage', type=int, nargs='?', required=False,
                     choices=range(1, num_of_stages+1), default=0,
                     help='Rendering stage number. '+str(num_of_stages)+' stages in total:'+
-                    '\n\t 1) input frames\n\t 2) vidstab\n\t 3) output frames\n\n')
+                    '\t 1) input frames\n\t 2) vidstab\t 3) output frames')
 parser.add_argument('-c', '--num_cpus', type=int, nargs='?', required=False,
                     default=num_cpus_default, choices=range(1, max_cpus),
                     help='Number of CPUs(processes) to use')
 parser.add_argument('--smoothing', type=int, nargs='?', required=False,
-                    default=128, choices=range(1, max_smoothing),
+                    default=default_smoothing_percent_of_fps, choices=range(1, max_smoothing),
                     help='smoothing in percents, 100% means FPS of the input video')
 parser.add_argument('--scantop', type=int, nargs='?', required=False,
                     default=0, choices=[0, 1],
-                    help='Scanning of lines of CMOS sensor in a video frame: 0=bottom-up, 1=top-down.\n'+
+                    help='Scanning of lines of CMOS sensor in a video frame: 0=bottom-up, 1=top-down.'+
                     'Depends on how the camera was held when shooting.')
+parser.add_argument('--use-projection', type=int, nargs='?', required=False,
+                    default=1, choices=[0, 1],
+                    help='Create and use frames with other Hugin projection for second pass of vidstab.\
+                    Projection is set by "input_vidstab_projection" parameter in config.')
 
 
 if __name__ == '__main__':
 
     args = parser.parse_args()
-    config.cfg = config.Configuration(parser)
+    cfg = config.cfg = config.Configuration(parser)
+    out_frms = out_frames.OutFrames(cfg)
+    in_frms = inp_frames.InFrames(cfg)
+    vs = vidstab.Vidstab(cfg)
 
     if args.stage == 0: # all stages
         ## start pipeline
+        in_frms.input_frames_and_audio()
+        in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input)
+        in_frms.create_input_projection_video(cfg.projection_video_1)
 
-        inp_frames.input_frames_and_audio()
+        vs.detect_projection(cfg.projection_video_1)
+        vs.transform_projection(cfg.projection_video_1)
 
-        vidstab.detect_original(config.cfg.args.videofile)
-        vidstab.transform_original(config.cfg.args.videofile)
+        out_frms.camera_rotations_projection()
+        if float(cfg.params['xy_lines']) > 0 or \
+           float(cfg.params['roll_lines']) > 0:
 
-        out_frames.camera_transforms()
-        vidstab.create_processed_vidstab_input()
-        vidstab.detect_original(config.cfg.processed_video)
-        vidstab.transform_original(config.cfg.processed_video)
-        out_frames.frames()
+            in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input_processed)
+            in_frms.create_input_projection_video(cfg.projection_video_2)
 
-        out_frames.video()
+            vs.detect_projection(cfg.projection_video_2)
+            vs.transform_projection(cfg.projection_video_2)
 
-        out_frames.out_filter()
+            out_frms.camera_rotations_processed(cfg.vidstab_projection_dir)
 
+        out_frms.frames()
+        out_frms.video()
+        out_frms.out_filter()
         ## end pipeline
+
     elif args.stage == 1:
-        inp_frames.input_frames_and_audio()
+        in_frms.input_frames_and_audio()
+        in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input)
+        in_frms.create_input_projection_video(cfg.projection_video_1)
     elif args.stage == 2:
-        vidstab.detect_original(config.cfg.args.videofile)
-        vidstab.transform_original(config.cfg.args.videofile)
+        ## TODO skimage image registration and rotation
+        vs.detect_projection(cfg.projection_video_1)
+        vs.transform_projection(cfg.projection_video_1)
     elif args.stage == 3:
+        out_frms.camera_rotations_projection()
 
-        vidstab.detect_original(config.cfg.args.videofile)
-        vidstab.transform_original(config.cfg.args.videofile)
+        if float(cfg.params['xy_lines']) > 0 or \
+           float(cfg.params['roll_lines']) > 0:
 
-        out_frames.camera_transforms()
+            in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input_processed)
+            in_frms.create_input_projection_video(cfg.projection_video_2)
 
-        if int(config.cfg.params['do_roll_lines']) > 0 or \
-           int(config.cfg.params['do_along_lines']) > 0 or \
-           int(config.cfg.params['do_across_lines']) > 0:
+            vs.detect_projection(cfg.projection_video_2)
+            vs.transform_projection(cfg.projection_video_2)
 
-            ## first pass
-            vidstab.create_processed_vidstab_input()
-            vidstab.detect_original(config.cfg.processed_video)
-            vidstab.transform_original(config.cfg.processed_video)
-            out_frames.camera_transforms_processed()
+            out_frms.camera_rotations_processed(cfg.vidstab_projection_dir)
 
-            ## second pass
-            out_frames.camera_transforms()
-            vidstab.create_processed_vidstab_input()
-            vidstab.detect_original(config.cfg.processed_video)
-            vidstab.transform_original(config.cfg.processed_video)
-            out_frames.camera_transforms_processed()
-
-        out_frames.frames()
-
-        out_frames.video()
-        out_frames.out_filter()
+        out_frms.frames()
 
     elif args.stage == 4:
-        out_frames.video()
+        out_frms.video()
     elif args.stage == 5:
-        out_frames.out_filter()
+        out_frms.out_filter()
     # elif args.stage == 6:
-    #     out_frames.cleanup()
+    #     utils.delete_filepath(cfg.projection_video_1)
+    #     out_frms.cleanup()

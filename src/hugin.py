@@ -16,13 +16,13 @@ def frames_output(task):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
     out_img = path.join(cfg.current_output_path, task.img)
-    task_pto_name = path.join(cfg.hugin_projects, task.pto_file)
+    task_pto_path = path.join(cfg.hugin_projects, task.pto_file)
 
-    run(cfg.nona_opts + ['-o', out_img, task_pto_name], stdout=DEVNULL)
+    run(cfg.nona_opts + ['-o', out_img, task_pto_path], stdout=DEVNULL)
 
     print('Frame: {}'.format(out_img))
     if frames_crop_q:
-        tmp_hugp = HuginPTO(task_pto_name)
+        tmp_hugp = HuginPTO(task_pto_path)
         frames_crop_q.put((tmp_hugp.crop_l, tmp_hugp.crop_r,
                            tmp_hugp.crop_t, tmp_hugp.crop_b), True)
 

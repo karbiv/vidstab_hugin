@@ -88,11 +88,14 @@ class Configuration:
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(data_path, 'audio'))
         self.audio_dir.mkdir(parents=True, exist_ok=True)
-        # self.vidstab_dir = Path(path.join(data_path, 'vidstab'))
-        # self.vidstab_dir.mkdir(parents=True, exist_ok=True)
-        # self.input_video = path.join(self.vidstab_dir, "input.mkv")
-        self.vidstab_orig_dir = Path(path.join(data_path, 'vidstab_orig'))
-        self.vidstab_orig_dir.mkdir(parents=True, exist_ok=True)
+
+        self.frames_projection_dir = Path(path.join(data_path, 'frames_input_vidstab_projection'))
+        self.frames_projection_dir.mkdir(parents=True, exist_ok=True)
+
+        self.vidstab_projection_dir = Path(path.join(data_path, 'vidstab_projection'))
+        self.vidstab_projection_dir.mkdir(parents=True, exist_ok=True)
+        self.projection_video_1 = path.join(self.vidstab_projection_dir, "input_projection_1.mkv")
+        self.projection_video_2 = path.join(self.vidstab_projection_dir, "input_projection_2.mkv")
 
         self.output_dir = Path(path.join(data_path, 'output'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -100,14 +103,10 @@ class Configuration:
 
         self.out_video = path.join(self.output_dir, 'out_video_input_projection.mkv')
         self.out_video_orig = path.join(self.output_dir, 'out_video.mkv')
-        self.out_video_filtered = path.join(self.output_dir, 'filtered_input_projection.mkv')
-        self.out_video_filtered_orig = path.join(self.output_dir, 'filtered.mkv')
+        self.out_video_filtered_name = 'filtered.mkv'
 
         self.rectilinear_pto_path = path.join(data_path, 'rectilinear.pto')
-        self.processed_video = path.join(self.vidstab_orig_dir, "input_processed.mkv")
-
-        self.frames_rectilinear = Path(path.join(data_path, 'frames_rectilinear'))
-        self.frames_rectilinear.mkdir(parents=True, exist_ok=True)
+        self.projection_pto_path = path.join(data_path, 'vidstab_projection.pto')
 
         self.frames_input_processed = Path(path.join(data_path, 'frames_input_processed'))
         self.frames_input_processed.mkdir(parents=True, exist_ok=True)
