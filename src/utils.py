@@ -55,7 +55,7 @@ def create_vidstab_projection_pto_file(pto_path):
     pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
     with open(pto_path, 'w') as f:
         f.write(pto_txt)
-    projection = cfg.params['vidstab_projection']
+    projection = cfg.args.vidstab_projection
     run(['pano_modify', '-o', pto_path,
          #'--canvas={}x{}'.format(cfg.pto.canvas_w*3, cfg.pto.canvas_h*3),
          '--crop=AUTO', pto_path, '--projection='+str(projection) ], stdout=DEVNULL)

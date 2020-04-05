@@ -15,7 +15,7 @@ import skimage.transform as sktf
 from skimage import io as skio
 from skimage.util import img_as_ubyte
 
-import timeit as tt
+#import timeit as tt
 
 
 def camera_rotations_wrap(instance, arg):
@@ -76,7 +76,6 @@ class OutFrames:
         utils.delete_files_in_dir(self.cfg.frames_input_processed)
         frames_worker = functools.partial(camera_rotations_projection_wrap, self)
         with Pool(int(self.cfg.args.num_cpus)) as p:
-            print('\nStart processes pool for creation of tasks.')
             print('Frames camera rotations:')
             p.map(frames_worker, tasks)
 
@@ -102,8 +101,8 @@ class OutFrames:
         pitch_deg = 0-math.degrees(math.atan(y*self.tan_pix))
         dest_img = img
 
-        if float(self.cfg.params['xy_lines']) > 0 or \
-           float(self.cfg.params['roll_lines']) > 0:
+        if float(self.cfg.args.xy_lines) > 0 or \
+           float(self.cfg.args.roll_lines) > 0:
             #### Rolling Shutter start
             sk_img = skio.imread(img, plugin='pil')
             projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2+t_rel.x,
@@ -113,7 +112,7 @@ class OutFrames:
             tx, ty = orig_coords.strip().split()
             orig_tx, orig_ty = float(tx) - self.cfg.pto.orig_w/2, self.cfg.pto.orig_h/2 - float(ty)
             warp_args = {'roll': t_rel.roll, 'y_move': orig_ty, 'along_move': orig_tx}
-            interpolation = int(self.cfg.params['rolling_shutter_interpolation'])
+            interpolation = int(self.cfg.args.rolling_shutter_interpolation)
             modified = sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
             # def test(): sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
             # print(tt.timeit(test, number=1))
@@ -145,12 +144,12 @@ class OutFrames:
         num_lines = self.cfg.pto.orig_h
 
         #### ACROSS and ALONG lines
-        if float(self.cfg.params['xy_lines']) > 0:
-            last_line_across = kwargs['y_move'] * float(self.cfg.params['xy_lines'])
+        if float(self.cfg.args.xy_lines) > 0:
+            last_line_across = kwargs['y_move'] * float(self.cfg.args.xy_lines)
             across_delta = last_line_across / num_lines
             across_line_shift = 0
 
-            last_line_along = kwargs['along_move'] * float(self.cfg.params['xy_lines'])
+            last_line_along = kwargs['along_move'] * float(self.cfg.args.xy_lines)
             along_delta = last_line_along / num_lines
             along_line_shift = 0
 
@@ -167,10 +166,10 @@ class OutFrames:
                 along_line_shift += along_delta
 
         #### ROLL lines
-        if float(self.cfg.params['roll_lines']) > 0:
+        if float(self.cfg.args.roll_lines) > 0:
 
             ## Roll is in degrees
-            roll_coeff = float(self.cfg.params['roll_lines'])
+            roll_coeff = float(self.cfg.args.roll_lines)
             last_line_roll = kwargs['roll'] * roll_coeff
             roll_delta = last_line_roll / num_lines
 
@@ -297,12 +296,26 @@ class OutFrames:
     def video(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        crf = '17'
+        crf = '14'
         ivid = path.join(self.cfg.frames_stabilized, '%06d.'+self.cfg.img_ext)
         iaud = path.join(self.cfg.audio_dir, 'audio.ogg')
-        output = self.cfg.out_video_orig
 
         fps = self.cfg.fps
+        xy_lines = self.cfg.args.xy_lines
+        roll_lines = self.cfg.args.roll_lines
+
+        if float(xy_lines) > 0 or float(roll_lines) > 0:
+            xy = self.cfg.args.xy_lines
+            roll = self.cfg.args.roll_lines
+            smooth = self.cfg.args.smoothing
+            lens_d = self.cfg.pto.lens_d or '0'
+            lens_e = self.cfg.pto.lens_e or '0'
+            fname = self.cfg.out_video_name
+            name = f'xy{xy}_r{roll}_smooth{smooth}_d{lens_d}_e{lens_e}_{fname}'
+        else:
+            name = self.cfg.out_video
+        output = path.join(self.cfg.output_dir, name)
+
         if path.isfile(iaud):
             cmd = ['ffmpeg', '-framerate', fps, '-i', ivid, '-i', iaud, '-c:v', 'libx264',
                    '-preset', 'veryfast', '-crf', crf, '-c:a', 'copy',
@@ -318,14 +331,14 @@ class OutFrames:
     def out_filter(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        filts = self.cfg.params['out_filter']
+        filts = 'crop=iw*0.945:ih*0.945:(iw-(iw*0.945))/2:(ih-(ih*0.945))/2,scale=1920:-1,crop=floor(iw/2)*2:floor(ih/2)*2,format=yuv420p'
         crf = '14'
-        ivid = self.cfg.out_video_orig
+        ivid = self.cfg.out_video
 
-        if float(self.cfg.params['xy_lines']) > 0 or \
-           float(self.cfg.params['roll_lines']) > 0:
-            xy = self.cfg.params['xy_lines']
-            roll = self.cfg.params['roll_lines']
+        if float(self.cfg.args.xy_lines) > 0 or \
+           float(self.cfg.args.roll_lines) > 0:
+            xy = self.cfg.args.xy_lines
+            roll = self.cfg.args.roll_lines
             smooth = self.cfg.args.smoothing
             fname = self.cfg.out_video_filtered_name
             name = f'xy{xy}_r{roll}_smooth{smooth}_{fname}'
@@ -350,4 +363,4 @@ class OutFrames:
         utils.delete_files_in_dir(self.cfg.frames_stabilized)
         utils.delete_files_in_dir(self.cfg.hugin_projects)
 
-        utils.delete_filepath(self.cfg.out_video_orig)
+        utils.delete_filepath(self.cfg.out_video)

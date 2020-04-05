@@ -5,7 +5,7 @@ from argparse import ArgumentParser, Action, RawTextHelpFormatter
 from os import path
 import config
 import inp_frames
-import vidstab
+import vidstab as vs
 import out_frames
 
 
@@ -27,7 +27,7 @@ num_of_stages = 5
 num_of_projections = 21 # Hugin projections
 max_cpus = 16
 max_smoothing = 128
-default_smoothing_percent_of_fps = 73
+default_smoothing_percent_of_fps = 68
 
 num_cpus_default = 7
 
@@ -56,70 +56,106 @@ parser.add_argument('--use-projection', type=int, nargs='?', required=False,
                     default=1, choices=[0, 1],
                     help='Create and use frames with other Hugin projection for second pass of vidstab.\
                     Projection is set by "input_vidstab_projection" parameter in config.')
+# ;;; Hugin projections
+# ; 0   rectilinear
+# ; 1   cylindrical
+# ; 2   equirectangular
+# ; 3   fisheye
+# ; 4   stereographic
+# ; 5   mercator
+# ; 6   trans mercator
+# ; 7   sinusoidal
+# ; 8   lambert cylindrical equal area
+# ; 9   lambert equal area azimuthal
+# ; 10  albers equal area conic
+# ; 11  miller cylindrical
+# ; 12  panini
+# ; 13  architectural
+# ; 14  orthographic
+# ; 15  equisolid
+# ; 16  equirectangular panini
+# ; 17  biplane
+# ; 18  triplane
+# ; 19  panini general
+# ; 20  thoby
+# ; 21  hammer-aitoff equal area
+parser.add_argument('--vidstab-projection', type=int, nargs='?', required=False,
+                    default=3, choices=[0, 21],
+                    help='Hugin projection number.')
+
+# ;;; Interpolation of Rolling Shutter corrected frames, 0 and 1 are faster
+# ; 0: Nearest-neighbor
+# ; 1: Bi-linear (default)
+# ; 2: Bi-quadratic
+# ; 3: Bi-cubic
+# ; 4: Bi-quartic
+# ; 5: Bi-quintic
+parser.add_argument('--rolling_shutter_interpolation', type=int, nargs='?', required=False,
+                    default=1, choices=[0, 5],
+                    help='Interpolation in rolling shutter correction.')
+
+# ;; png, jpg|jpeg, tif|tiff.
+parser.add_argument('--img_format', type=str, nargs='?', required=False,
+                    default='png', choices=['png', 'jpg', 'jpeg', 'tif', 'tiff'],
+                    help='Image format for frames.')
+parser.add_argument('--jpeg_quality', type=int, nargs='?', required=False,
+                    default=98, choices=[98],
+                    help='JPEG quality, if img_format is jpg.')
+
+## Rolling Shutter correction coeffs
+parser.add_argument('--xy_lines', type=float, nargs='?', required=False,
+                    default=0.44, #choices=range(0, 3.0),
+                    help='Rolling shutter correction coefficient for translation x and y.')
+parser.add_argument('--roll_lines', type=float, nargs='?', required=False,
+                    default=0.55, #choices=range(0, 3.0),
+                    help='Rolling shutter correction coefficient for camera roll.')
+
+## libvidstab options
+parser.add_argument('--mincontrast', type=float, nargs='?', required=False,
+                    default=0.55, #choices=range(0, 1.0),
+                    help='Libvidstab mincontrast')
+parser.add_argument('--stepsize', type=int, nargs='?', required=False,
+                    default=6, choices=range(1, 32),
+                    help='Libvidstab stepsize')
 
 
 if __name__ == '__main__':
 
     args = parser.parse_args()
+    
     cfg = config.cfg = config.Configuration(parser)
+    
     out_frms = out_frames.OutFrames(cfg)
-    in_frms = inp_frames.InFrames(cfg)
-    vs = vidstab.Vidstab(cfg)
+    inframes = inp_frames.InFrames(cfg)
+    vidstab = vs.Vidstab(cfg)
+    xy_lines = cfg.args.xy_lines
+    roll_lines = cfg.args.roll_lines
 
     if args.stage == 0: # all stages
         ## start pipeline
-        in_frms.input_frames_and_audio()
-        in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input)
-        in_frms.create_input_projection_video(cfg.projection_video_1)
 
-        vs.detect_projection(cfg.projection_video_1)
-        vs.transform_projection(cfg.projection_video_1)
-
-        out_frms.camera_rotations_projection()
-        if float(cfg.params['xy_lines']) > 0 or \
-           float(cfg.params['roll_lines']) > 0:
-
-            in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input_processed)
-            in_frms.create_input_projection_video(cfg.projection_video_2)
-
-            vs.detect_projection(cfg.projection_video_2)
-            vs.transform_projection(cfg.projection_video_2)
-
-            out_frms.camera_rotations_processed(cfg.vidstab_projection_dir)
-
-        out_frms.frames()
-        out_frms.video()
-        out_frms.out_filter()
         ## end pipeline
+        pass
 
     elif args.stage == 1:
-        in_frms.input_frames_and_audio()
-        in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input)
-        in_frms.create_input_projection_video(cfg.projection_video_1)
+        inframes.create_original_frames_and_audio()
     elif args.stage == 2:
-        ## TODO skimage image registration and rotation
-        vs.detect_projection(cfg.projection_video_1)
-        vs.transform_projection(cfg.projection_video_1)
+        inframes.create_projection_frames(cfg.projection_dir1)
+        inframes.create_input_video_for_vidstab(cfg.projection_dir1, cfg.vidstab_pass1_dir)
+        vidstab.analyze(cfg.vidstab_projection_dir1)
     elif args.stage == 3:
         out_frms.camera_rotations_projection()
-
-        if float(cfg.params['xy_lines']) > 0 or \
-           float(cfg.params['roll_lines']) > 0:
-
-            in_frms.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input_processed)
-            in_frms.create_input_projection_video(cfg.projection_video_2)
-
-            vs.detect_projection(cfg.projection_video_2)
-            vs.transform_projection(cfg.projection_video_2)
-
+        if float(xy_lines) > 0 or float(roll_lines) > 0:
+            inframes.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input_processed)
+            inframes.create_input_projection_video(cfg.projection_video_2)
+            vidstab.analyze(cfg.projection_video_2)
             out_frms.camera_rotations_processed(cfg.vidstab_projection_dir)
-
-        out_frms.frames()
-
     elif args.stage == 4:
-        out_frms.video()
+        out_frms.frames()
     elif args.stage == 5:
+        out_frms.video()
+    elif args.stage == 6:
         out_frms.out_filter()
-    # elif args.stage == 6:
+    # elif args.stage == 7:
     #     utils.delete_filepath(cfg.projection_video_1)
     #     out_frms.cleanup()

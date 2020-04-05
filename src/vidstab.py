@@ -11,17 +11,17 @@ class Vidstab:
         self.cfg = cfg
 
 
-    def detect_projection(self, input_video):
+    def analyze(self, dest):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         trf = 'transforms.trf'
-        dest = self.cfg.vidstab_projection_dir
 
-        step = 'stepsize='+str(self.cfg.params['stepsize'])
-        mincontrast = float(self.cfg.params['motion_detection_mincontrast'])
+        step = 'stepsize='+str(self.cfg.args.stepsize)
+        mincontrast = float(self.cfg.args.mincontrast)
         detect = 'vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=1'
 
-        cropf = self.cfg.params['input_video_filter']
-        filts = '{},{}'.format(cropf, detect.format(step, mincontrast, trf))
+        #cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
+        #filts = '{},{}'.format(cropf, detect.format(step, mincontrast, trf))
+        filts = detect.format(step, mincontrast, trf)
 
         show_detect = path.join(dest, 'show.mkv')
         cmd = ['ffmpeg', '-i', input_video, '-c:v', 'libx264', '-crf', '18',
@@ -34,22 +34,26 @@ class Vidstab:
         print(' '.join(cmd))
         run(cmd, cwd=dest)
 
+        ## saves global_motions.trf
+        self.transform(dest)
 
-    def transform_projection(self, input_file):
+
+    def transform(self, dest):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         trf = 'transforms.trf'
-        dest = self.cfg.vidstab_projection_dir
+        #dest = self.cfg.vidstab_projection_dir
         out = os.path.join(dest, 'stabilized.mkv')
 
         crf = '18'
         smoothing_percent = int(self.cfg.args.smoothing)
         smoothing = round((int(self.cfg.fps)/100)*smoothing_percent)
         sm = 'smoothing={0}:relative=1'.format(smoothing)
-        cropf = self.cfg.params['input_video_filter']
-        f = '{},vidstabtransform=debug=1:input={}:{}:optzoom=0:crop=black'.format(cropf, trf, sm)
+        #cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
+        #f = '{},vidstabtransform=debug=0:input={}:{}:optzoom=0:crop=black'.format(cropf, trf, sm)
+        f = 'vidstabtransform=debug=0:input={}:{}:optzoom=0:crop=black'.format(trf, sm)
 
-        cmd = ['ffmpeg', '-i', input_file, '-vf', f, '-c:v', 'libx264', '-crf', crf,
-               #'-t', '00:00:00.250',
+        cmd = ['ffmpeg', '-i', input_video, '-vf', f, '-c:v', 'libx264', '-crf', crf,
+               '-t', '00:00:00.250',
                '-an', '-y', '-stats', out]
         print(' '.join(cmd))
         run(cmd, cwd=dest)
