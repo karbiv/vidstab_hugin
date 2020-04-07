@@ -33,23 +33,31 @@ class InFrames():
         ## video
         # cmd1 = ['ffmpeg', '-loglevel', 'error', '-stats', '-i', inp, '-qscale:v', '1',
         #         path.join(self.cfg.datapath, self.cfg.frames_input, '%06d.'+self.cfg.img_ext), '-y']
-        cmd1 = ['ffmpeg', '-loglevel', 'error', '-stats', '-i', inp,
+        cmd1 = ['ffmpeg',
+                '-loglevel', 'error',
+                '-stats',
+                '-i', inp,
                 path.join(self.cfg.frames_input, '%06d.'+self.cfg.img_ext), '-y']
 
         ## audio
-        cmd2 = ['ffmpeg', '-loglevel', 'error', '-stats', '-i', self.cfg.args.videofile,
+        cmd2 = ['ffmpeg',
+                '-loglevel', 'error',
+                '-stats',
+                '-i', self.cfg.args.videofile,
                 '-vn', '-aq', str(3), '-y', oaud]
 
+        print(self.cfg.frames_input)
+        print(oaud)
         run(cmd1)
         run(cmd2)
 
 
-    def create_projection_frames(self, dest_dir):
+    def create_projection_frames(self, frames_input_dir, dest_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         utils.create_vidstab_projection_pto_file(self.cfg.projection_pto_path)
         self.prjn_pto_txt = utils.create_pto_txt_one_image(self.cfg.projection_pto_path)
 
-        imgs = sorted(os.listdir(self.cfg.frames_input))
+        imgs = sorted(os.listdir(frames_input_dir))
         tasks = []
         for i, img in enumerate(imgs):
             tasks.append((img,))
@@ -77,16 +85,16 @@ class InFrames():
         task_pto_path = path.join(self.cfg.hugin_projects, pto_name)
         run(self.cfg.nona_opts + ['-o', out_img, task_pto_path], stdout=DEVNULL)
 
-        print(task_pto_path)
+        print(out_img)
 
 
-    def create_input_video_for_vidstab(self, inp_frames_dir, dest_dir):
+    def create_input_video_for_vidstab(self, inp_frames_dir, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         crf = '14'
         ivid = path.join(inp_frames_dir, '%06d.'+self.cfg.img_ext)
-        output = path.join(dest_dir, self.cfg.projection_video_name)
-        ## divisable by 2, video size required by libvidstab
+        output = path.join(vidstab_dir, self.cfg.projection_video_name)
+        ## divisable by 2, video size required by libvidstab and other FFMPEG filters
         cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
 
         cmd = ['ffmpeg', '-framerate', self.cfg.fps, '-i', ivid,

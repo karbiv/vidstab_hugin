@@ -27,7 +27,7 @@ num_of_stages = 5
 num_of_projections = 21 # Hugin projections
 max_cpus = 16
 max_smoothing = 128
-default_smoothing_percent_of_fps = 68
+default_smoothing_percent_of_fps = 85
 
 num_cpus_default = 7
 
@@ -50,7 +50,7 @@ parser.add_argument('--smoothing', type=int, nargs='?', required=False,
                     help='smoothing in percents, 100% means FPS of the input video')
 parser.add_argument('--scantop', type=int, nargs='?', required=False,
                     default=0, choices=[0, 1],
-                    help='Scanning of lines of CMOS sensor in a video frame: 0=bottom-up, 1=top-down.'+
+                    help='Scanning direction of lines in the CMOS image sensor: 0=bottom-up, 1=top-down.'+
                     'Depends on how the camera was held when shooting.')
 parser.add_argument('--use-projection', type=int, nargs='?', required=False,
                     default=1, choices=[0, 1],
@@ -103,16 +103,20 @@ parser.add_argument('--jpeg_quality', type=int, nargs='?', required=False,
                     help='JPEG quality, if img_format is jpg.')
 
 ## Rolling Shutter correction coeffs
+# xy_dflt = 0.44
+# roll_dflt = 0.45
+xy_dflt = 0
+roll_dflt = 0
 parser.add_argument('--xy_lines', type=float, nargs='?', required=False,
-                    default=0.44, #choices=range(0, 3.0),
+                    default=xy_dflt, #choices=range(0, 3.0),
                     help='Rolling shutter correction coefficient for translation x and y.')
 parser.add_argument('--roll_lines', type=float, nargs='?', required=False,
-                    default=0.55, #choices=range(0, 3.0),
+                    default=roll_dflt, #choices=range(0, 3.0),
                     help='Rolling shutter correction coefficient for camera roll.')
 
 ## libvidstab options
 parser.add_argument('--mincontrast', type=float, nargs='?', required=False,
-                    default=0.55, #choices=range(0, 1.0),
+                    default=0.3, #choices=range(0, 1.0),
                     help='Libvidstab mincontrast')
 parser.add_argument('--stepsize', type=int, nargs='?', required=False,
                     default=6, choices=range(1, 32),
@@ -122,9 +126,9 @@ parser.add_argument('--stepsize', type=int, nargs='?', required=False,
 if __name__ == '__main__':
 
     args = parser.parse_args()
-    
+
     cfg = config.cfg = config.Configuration(parser)
-    
+
     out_frms = out_frames.OutFrames(cfg)
     inframes = inp_frames.InFrames(cfg)
     vidstab = vs.Vidstab(cfg)
@@ -132,30 +136,44 @@ if __name__ == '__main__':
     roll_lines = cfg.args.roll_lines
 
     if args.stage == 0: # all stages
+
         ## start pipeline
+        inframes.create_original_frames_and_audio()
+
+        inframes.create_projection_frames(cfg.frames_input, cfg.projection_dir1_frames)
+        inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames, cfg.projection_dir1_vidstab)
+        vidstab.analyze(cfg.projection_dir1_vidstab)
+
+        out_frms.compute_camera_rotations(cfg.projection_dir1_vidstab)
+        if float(xy_lines) > 0 or float(roll_lines) > 0:
+            inframes.create_projection_frames(cfg.frames_input_processed, cfg.projection_dir2_frames)
+            inframes.create_input_video_for_vidstab(cfg.projection_dir2_frames, cfg.projection_dir2_vidstab)
+            vidstab.analyze(cfg.projection_dir2_vidstab)
+            out_frms.compute_camera_rotations_processed(cfg.projection_dir2_vidstab)
+
+        out_frms.frames()
+
+        out_frms.video()
 
         ## end pipeline
-        pass
 
     elif args.stage == 1:
         inframes.create_original_frames_and_audio()
     elif args.stage == 2:
-        inframes.create_projection_frames(cfg.projection_dir1)
-        inframes.create_input_video_for_vidstab(cfg.projection_dir1, cfg.vidstab_pass1_dir)
-        vidstab.analyze(cfg.vidstab_projection_dir1)
+        inframes.create_projection_frames(cfg.frames_input, cfg.projection_dir1_frames)
+        inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames, cfg.projection_dir1_vidstab)
+        vidstab.analyze(cfg.projection_dir1_vidstab)
     elif args.stage == 3:
-        out_frms.camera_rotations_projection()
+        out_frms.compute_camera_rotations(cfg.projection_dir1_vidstab)
         if float(xy_lines) > 0 or float(roll_lines) > 0:
-            inframes.input_frames_vidstab_projection(frames_input_dir=cfg.frames_input_processed)
-            inframes.create_input_projection_video(cfg.projection_video_2)
-            vidstab.analyze(cfg.projection_video_2)
-            out_frms.camera_rotations_processed(cfg.vidstab_projection_dir)
+            inframes.create_projection_frames(cfg.frames_input_processed, cfg.projection_dir2_frames)
+            inframes.create_input_video_for_vidstab(cfg.projection_dir2_frames, cfg.projection_dir2_vidstab)
+            vidstab.analyze(cfg.projection_dir2_vidstab)
+            out_frms.compute_camera_rotations_processed(cfg.projection_dir2_vidstab)
+
+        out_frms.frames()
+        out_frms.video()
     elif args.stage == 4:
         out_frms.frames()
     elif args.stage == 5:
         out_frms.video()
-    elif args.stage == 6:
-        out_frms.out_filter()
-    # elif args.stage == 7:
-    #     utils.delete_filepath(cfg.projection_video_1)
-    #     out_frms.cleanup()

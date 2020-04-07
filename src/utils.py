@@ -5,6 +5,7 @@ import re
 from subprocess import run, check_output, DEVNULL
 from math import radians as rads
 from math import degrees as degs
+import numpy as np
 import config
 import datatypes
 
@@ -87,6 +88,35 @@ def delete_filepath(file_path):
     except Exception as e:
         pass
 
+
+def gauss_filter(fps, transforms_abs, smooth_percent):
+        smoothing = round((int(fps)/100)*int(smooth_percent))
+        mu = smoothing
+        s = mu*2+1
+
+        sigma2 = (mu/2)**2
+
+        kernel = np.exp(-(np.arange(s)-mu)**2/sigma2)
+
+        transforms_filtered = [0]*len(transforms_abs)
+        tlen = len(transforms_abs)
+        for i in range(tlen):
+            ## make a convolution:
+            weightsum, avg = 0.0, datatypes.transform(0, 0, 0)
+            for k in range(s):
+                idx = i+k-mu
+                if idx >= 0 and idx < tlen:
+                    weightsum += kernel[k]
+                    avg = add_transforms(avg, mult_transforms(transforms_abs[idx], kernel[k]))
+
+            if weightsum > 0:
+                avg = mult_transforms(avg, 1.0/weightsum)
+                ## high frequency must be transformed away
+                transforms_filtered[i] = sub_transforms(transforms_abs[i], avg)
+
+        return transforms_filtered
+    
+
 def convert_relative_transforms_to_absolute(transforms_rel):
     '''Relative to absolute (integrate transformations)'''
     transforms_abs = [0]*len(transforms_rel)
@@ -99,18 +129,18 @@ def convert_relative_transforms_to_absolute(transforms_rel):
     return transforms_abs
 
 
-def convert_absolute_motions_to_relative(motions_abs):
-    '''Absolute motions to relative'''
-    motions_rel = []
-    motions_abs_r = motions_abs[:]
-    motions_abs_r.reverse()
-    currm = motions_abs_r[0] # last
-    for nextm in motions_abs_r[1:]:
-        motions_rel.append(sub_transforms(currm, nextm))
-        currm = nextm
-    motions_rel.append(datatypes.transform(0, 0, 0))
-    motions_rel.reverse()
-    return motions_rel
+# def convert_absolute_motions_to_relative(motions_abs):
+#     '''Absolute motions to relative'''
+#     motions_rel = []
+#     motions_abs_r = motions_abs[:]
+#     motions_abs_r.reverse()
+#     currm = motions_abs_r[0] # last
+#     for nextm in motions_abs_r[1:]:
+#         motions_rel.append(sub_transforms(currm, nextm))
+#         currm = nextm
+#     motions_rel.append(datatypes.transform(0, 0, 0))
+#     motions_rel.reverse()
+#     return motions_rel
 
 
 def get_global_motions(from_dir, filename='global_motions.trf'):

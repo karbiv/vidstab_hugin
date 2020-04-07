@@ -15,8 +15,6 @@ import skimage.transform as sktf
 from skimage import io as skio
 from skimage.util import img_as_ubyte
 
-#import timeit as tt
-
 
 def camera_rotations_wrap(instance, arg):
     return instance.camera_rotations_worker(arg)
@@ -45,7 +43,7 @@ class OutFrames:
         self.rpto = utils.create_rectilinear_pto()
 
 
-    def camera_rotations_projection(self):
+    def compute_camera_rotations(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         frames_dir = self.cfg.frames_input
@@ -54,9 +52,9 @@ class OutFrames:
         horizont_tan = math.tan(self.half_hfov)
         self.tan_pix = horizont_tan/(self.rpto.canvas_w/2)
 
-        transforms_rel = utils.get_global_motions(self.cfg.vidstab_projection_dir)
+        transforms_rel = utils.get_global_motions(vidstab_dir)
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
-        transforms_abs_filtered = self.gauss_filter(transforms_abs, self.cfg.args.smoothing)
+        transforms_abs_filtered = utils.gauss_filter(self.cfg.fps, transforms_abs, self.cfg.args.smoothing)
 
         ## set center coords to lens' optical axis
         path_img = path.join(frames_dir, imgs[0])
@@ -76,7 +74,7 @@ class OutFrames:
         utils.delete_files_in_dir(self.cfg.frames_input_processed)
         frames_worker = functools.partial(camera_rotations_projection_wrap, self)
         with Pool(int(self.cfg.args.num_cpus)) as p:
-            print('Frames camera rotations:')
+            print('Camera rotations in pto files and if enabled, rolling shutter correction:')
             p.map(frames_worker, tasks)
 
 
@@ -114,8 +112,6 @@ class OutFrames:
             warp_args = {'roll': t_rel.roll, 'y_move': orig_ty, 'along_move': orig_tx}
             interpolation = int(self.cfg.args.rolling_shutter_interpolation)
             modified = sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
-            # def test(): sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
-            # print(tt.timeit(test, number=1))
 
             dest_img = path.join(self.cfg.frames_input_processed, path.basename(img))
             if self.cfg.is_jpeg:
@@ -135,12 +131,16 @@ class OutFrames:
         with open(path.join(self.cfg.hugin_projects, filepath), 'w') as f:
             f.write(curr_pto_txt)
 
-        print(path.join(self.cfg.hugin_projects, filepath))
+        ## Show progress
+        if float(self.cfg.args.xy_lines) > 0 or float(self.cfg.args.roll_lines) > 0:
+            print(dest_img)
+        else:
+            print(path.join(self.cfg.hugin_projects, filepath))
+
 
 
     def rolling_shutter_mappings(self, xy, **kwargs):
         '''Inverse map function'''
-        #num_lines = 1080
         num_lines = self.cfg.pto.orig_h
 
         #### ACROSS and ALONG lines
@@ -193,7 +193,7 @@ class OutFrames:
         return xy
 
 
-    def camera_rotations_processed(self, vidstab_dir):
+    def compute_camera_rotations_processed(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         frames_dir = self.cfg.frames_input_processed
@@ -204,7 +204,7 @@ class OutFrames:
 
         transforms_rel = utils.get_global_motions(vidstab_dir)
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
-        transforms_abs_filtered = self.gauss_filter(transforms_abs, self.cfg.args.smoothing)
+        transforms_abs_filtered = utils.gauss_filter(self.cfg.fps, transforms_abs, self.cfg.args.smoothing)
 
         self.pto_txt = utils.create_pto_txt_one_image(self.cfg.pto.filepath)
 
@@ -265,34 +265,6 @@ class OutFrames:
             p.map(hugin.frames_output, tasks)
 
 
-    def gauss_filter(self, transforms, smooth_percent):
-        transforms_copy = transforms.copy()
-        smoothing = round((int(self.cfg.fps)/100)*int(smooth_percent))
-        mu = smoothing
-        s = mu*2+1
-
-        sigma2 = (mu/2)**2
-
-        kernel = np.exp(-(np.arange(s)-mu)**2/sigma2)
-
-        tlen = len(transforms)
-        for i in range(tlen):
-            ## make a convolution:
-            weightsum, avg = 0.0, datatypes.transform(0, 0, 0)
-            for k in range(s):
-                idx = i+k-mu
-                if idx >= 0 and idx < tlen:
-                    weightsum += kernel[k]
-                    avg = utils.add_transforms(avg, utils.mult_transforms(transforms_copy[idx], kernel[k]))
-
-            if weightsum > 0:
-                avg = utils.mult_transforms(avg, 1.0/weightsum)
-                ## high frequency must be transformed away
-                transforms[i] = utils.sub_transforms(transforms[i], avg)
-
-        return transforms
-
-
     def video(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
@@ -314,26 +286,32 @@ class OutFrames:
             name = f'xy{xy}_r{roll}_smooth{smooth}_d{lens_d}_e{lens_e}_{fname}'
         else:
             name = self.cfg.out_video
-        output = path.join(self.cfg.output_dir, name)
+        output = path.join(self.cfg.out_video_dir, name)
 
         if path.isfile(iaud):
             cmd = ['ffmpeg', '-framerate', fps, '-i', ivid, '-i', iaud, '-c:v', 'libx264',
                    '-preset', 'veryfast', '-crf', crf, '-c:a', 'copy',
-                   '-loglevel', 'error', '-stats', '-y', output]
+                   '-loglevel', 'error',
+                   '-stats',
+                   '-y', output]
         else:
             cmd = ['ffmpeg', '-framerate', fps, '-i', ivid, '-c:v', 'libx264',
                     '-preset', 'veryfast', '-crf', crf,
-                   '-loglevel', 'error', '-stats', '-an', '-y', output]
+                   '-loglevel', 'error',
+                   '-stats',
+                   '-an', '-y', output]
 
         run(cmd)
+        ## output video FFMPEG filter
+        #self.out_filter(output)
 
 
-    def out_filter(self):
+    def out_filter(self, videoname):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         filts = 'crop=iw*0.945:ih*0.945:(iw-(iw*0.945))/2:(ih-(ih*0.945))/2,scale=1920:-1,crop=floor(iw/2)*2:floor(ih/2)*2,format=yuv420p'
         crf = '14'
-        ivid = self.cfg.out_video
+        ivid = videoname
 
         if float(self.cfg.args.xy_lines) > 0 or \
            float(self.cfg.args.roll_lines) > 0:
@@ -345,7 +323,7 @@ class OutFrames:
         else:
             name = self.cfg.out_video_filtered_name
         print(name)
-        output = path.join(self.cfg.output_dir, name)
+        output = path.join(self.cfg.out_video_dir, name)
 
         cmd = ['ffmpeg', '-i', ivid, '-c:v', 'libx264', '-vf', filts, '-crf', crf,
                '-c:a', 'copy', '-loglevel', 'error', '-stats', '-y', output]

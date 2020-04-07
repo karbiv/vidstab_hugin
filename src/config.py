@@ -59,7 +59,6 @@ class Configuration:
         ## create output video subdir tree
         ##
         data_dir_name = re.sub(r'[/\\.]+', '_', args.videofile).strip('_')
-        #data_dir = path.join(path.abspath(args.project), self.renders_dirname, data_dir_name)
         self.data_dir = path.join(path.abspath(args.project), self.renders_dirname, data_dir_name)
         self.workdir = Path(path.join(self.data_dir, 'workdir'))
         self.workdir.mkdir(parents=True, exist_ok=True)
@@ -75,22 +74,25 @@ class Configuration:
         self.frames_input.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(self.input_dir, 'audio'))
         self.audio_dir.mkdir(parents=True, exist_ok=True)
-        self.frames_input_processed = Path(path.join(self.input_dir, 'frames_corrected_rolling_shutter'))
-        self.frames_input_processed.mkdir(parents=True, exist_ok=True)
 
+        ### Lens projections
+        self.projection_video_name = "input_projection.mkv"
+        ## pass 1
         self.projection_basedir1 = Path(path.join(self.data_dir, '2__lens_projection_frames'))
         self.projection_basedir1.mkdir(parents=True, exist_ok=True)
-        self.projection_dir1 = Path(path.join(self.projection_basedir1, 'frames'))
-        self.projection_dir1.mkdir(parents=True, exist_ok=True)
-        self.vidstab_pass1_dir = Path(path.join(self.projection_basedir1, 'vidstab_pass'))
-        self.vidstab_pass1_dir.mkdir(parents=True, exist_ok=True)
-
+        self.projection_dir1_frames = Path(path.join(self.projection_basedir1, 'projection_frames'))
+        self.projection_dir1_frames.mkdir(parents=True, exist_ok=True)
+        self.projection_dir1_vidstab = Path(path.join(self.projection_basedir1, 'vidstab_pass'))
+        self.projection_dir1_vidstab.mkdir(parents=True, exist_ok=True)
+        ## pass 2
         self.projection_basedir2 = Path(path.join(self.data_dir, '3__lens_projection_frames_corrected_rolling_shutter'))
         self.projection_basedir2.mkdir(parents=True, exist_ok=True)
-        self.projection_dir2 = Path(path.join(self.projection_basedir2, 'frames'))
-        self.projection_dir2.mkdir(parents=True, exist_ok=True)
-        self.vidstab_pass2_dir = Path(path.join(self.projection_basedir2, 'vidstab_pass'))
-        self.vidstab_pass2_dir.mkdir(parents=True, exist_ok=True)
+        self.frames_input_processed = Path(path.join(self.projection_basedir2, 'original_frames_corrected_rolling_shutter'))
+        self.frames_input_processed.mkdir(parents=True, exist_ok=True)
+        self.projection_dir2_frames = Path(path.join(self.projection_basedir2, 'projection_frames'))
+        self.projection_dir2_frames.mkdir(parents=True, exist_ok=True)
+        self.projection_dir2_vidstab = Path(path.join(self.projection_basedir2, 'vidstab_pass'))
+        self.projection_dir2_vidstab.mkdir(parents=True, exist_ok=True)
 
         self.frames_stabilized = Path(path.join(self.data_dir, '4__stabilized_lens_projection_frames'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
@@ -100,8 +102,6 @@ class Configuration:
         self.out_video_dir = Path(path.join(self.data_dir, '5__output'))
         self.out_video_dir.mkdir(parents=True, exist_ok=True)
         self.out_video = path.join(self.out_video_dir, self.out_video_name)
-
-        self.projection_video_name = "input_projection.mkv"
 
 
 cfg: Configuration = None
