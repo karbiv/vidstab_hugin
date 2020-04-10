@@ -27,7 +27,7 @@ num_of_stages = 5
 num_of_projections = 21 # Hugin projections
 max_cpus = 16
 max_smoothing = 128
-default_smoothing_percent_of_fps = 85
+default_smoothing_percent_of_fps = 64
 
 num_cpus_default = 7
 
@@ -103,10 +103,10 @@ parser.add_argument('--jpeg_quality', type=int, nargs='?', required=False,
                     help='JPEG quality, if img_format is jpg.')
 
 ## Rolling Shutter correction coeffs
-# xy_dflt = 0.44
-# roll_dflt = 0.45
-xy_dflt = 0
-roll_dflt = 0
+# xy_dflt = 0
+# roll_dflt = 0
+xy_dflt = 0.37
+roll_dflt = 0.75
 parser.add_argument('--xy_lines', type=float, nargs='?', required=False,
                     default=xy_dflt, #choices=range(0, 3.0),
                     help='Rolling shutter correction coefficient for translation x and y.')
@@ -116,10 +116,11 @@ parser.add_argument('--roll_lines', type=float, nargs='?', required=False,
 
 ## libvidstab options
 parser.add_argument('--mincontrast', type=float, nargs='?', required=False,
-                    default=0.3, #choices=range(0, 1.0),
+                    default=0.4, #choices=range(0, 1.0),
                     help='Libvidstab mincontrast')
+stepsize = 6
 parser.add_argument('--stepsize', type=int, nargs='?', required=False,
-                    default=6, choices=range(1, 32),
+                    default=stepsize, choices=range(1, 32),
                     help='Libvidstab stepsize')
 
 

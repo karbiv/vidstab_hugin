@@ -86,9 +86,6 @@ class OutFrames:
                                            self.projection_pto.canvas_h/2 - t.y)
         orig_coords = check_output(['pano_trafo', '-r', self.cfg.projection_pto_path, '0'],
                                    input=projection_coords.encode('utf-8'))
-        # _ox, _oy = orig_coords.strip().split()
-        # ox, oy = float(_ox)+self.cfg.pto.lens_d, float(_oy)-self.cfg.pto.lens_e
-        # orig_coords = f'{ox} {oy}'.encode('utf-8')
         ## get rectilinear coords from original
         rcoords = check_output(['pano_trafo', self.rpto.filepath, '0'], input=orig_coords).strip().split()
 
@@ -138,11 +135,15 @@ class OutFrames:
             print(path.join(self.cfg.hugin_projects, filepath))
 
 
-
     def rolling_shutter_mappings(self, xy, **kwargs):
         '''Inverse map function'''
         num_lines = self.cfg.pto.orig_h
 
+        if self.cfg.args.scantop == 0:
+            line_idxs = tuple(reversed(range(num_lines)))
+        else:
+            line_idxs = tuple(range(num_lines))
+        
         #### ACROSS and ALONG lines
         if float(self.cfg.args.xy_lines) > 0:
             last_line_across = kwargs['y_move'] * float(self.cfg.args.xy_lines)
@@ -153,8 +154,7 @@ class OutFrames:
             along_delta = last_line_along / num_lines
             along_line_shift = 0
 
-            #for i in range(num_lines):
-            for i in reversed(range(num_lines)): # bottom-up
+            for i in line_idxs: # bottom-up
                 ## across
                 y = xy[i::num_lines, 1]
                 xy[i::num_lines, 1] = y + across_line_shift
@@ -180,8 +180,7 @@ class OutFrames:
             theta = 0
             cxy = np.column_stack((cx, cy))
 
-            #for i in range(num_lines):
-            for i in reversed(range(num_lines)):
+            for i in line_idxs:
                 x, y = cxy[i::num_lines].T
                 ox = math.cos(theta)*x - math.sin(theta)*y
                 oy = math.sin(theta)*x + math.cos(theta)*y
@@ -303,7 +302,7 @@ class OutFrames:
 
         run(cmd)
         ## output video FFMPEG filter
-        #self.out_filter(output)
+        self.out_filter(output)
 
 
     def out_filter(self, videoname):

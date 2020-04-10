@@ -14,8 +14,8 @@ class Vidstab:
     def analyze(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         trf = 'transforms.trf'
-
         input_video = path.join(vidstab_dir, self.cfg.projection_video_name)
+
         step = 'stepsize='+str(self.cfg.args.stepsize)
         mincontrast = float(self.cfg.args.mincontrast)
         detect = 'vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=1'
@@ -46,10 +46,11 @@ class Vidstab:
         smoothing_percent = int(self.cfg.args.smoothing)
         smoothing = round((int(self.cfg.fps)/100)*smoothing_percent)
         sm = 'smoothing={0}:relative=1'.format(smoothing)
-        f = 'vidstabtransform=debug=1:input={}:{}:optzoom=0:crop=black'.format(trf, sm)
+        maxangle = 0.6 # radians
+        f = 'vidstabtransform=debug=1:input={}:{}:optzoom=0:crop=black:maxangle={}'.format(trf, sm, maxangle)
 
         cmd = ['ffmpeg', '-i', input_video, '-vf', f, '-c:v', 'libx264', '-crf', crf,
-               '-t', '00:00:00.250',
+               '-t', '00:00:00.150',
                '-an', '-y',
                '-loglevel', 'error',
                '-stats',

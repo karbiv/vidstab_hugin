@@ -75,6 +75,7 @@ class Configuration:
         self.audio_dir = Path(path.join(self.input_dir, 'audio'))
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
+        
         ### Lens projections
         self.projection_video_name = "input_projection.mkv"
         ## pass 1
@@ -89,14 +90,21 @@ class Configuration:
         self.projection_basedir2.mkdir(parents=True, exist_ok=True)
         self.frames_input_processed = Path(path.join(self.projection_basedir2, 'original_frames_corrected_rolling_shutter'))
         self.frames_input_processed.mkdir(parents=True, exist_ok=True)
+
+        # ## test, sharpen motion blurred
+        # self.frames_processed_for_stab = Path(path.join(self.projection_basedir2, 'original_frames_corrected_filtered'))
+        # self.frames_processed_for_stab.mkdir(parents=True, exist_ok=True)
+        
         self.projection_dir2_frames = Path(path.join(self.projection_basedir2, 'projection_frames'))
         self.projection_dir2_frames.mkdir(parents=True, exist_ok=True)
         self.projection_dir2_vidstab = Path(path.join(self.projection_basedir2, 'vidstab_pass'))
         self.projection_dir2_vidstab.mkdir(parents=True, exist_ok=True)
 
+
         self.frames_stabilized = Path(path.join(self.data_dir, '4__stabilized_lens_projection_frames'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
 
+        
         self.out_video_name = 'out_video.mkv'
         self.out_video_filtered_name = 'filtered.mkv'
         self.out_video_dir = Path(path.join(self.data_dir, '5__output'))
