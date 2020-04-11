@@ -43,7 +43,7 @@ class OutFrames:
         self.rpto = utils.create_rectilinear_pto()
 
 
-    def compute_camera_rotations(self, vidstab_dir):
+    def compute_hugin_camera_rotations(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         frames_dir = self.cfg.frames_input
@@ -111,10 +111,8 @@ class OutFrames:
             modified = sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
 
             dest_img = path.join(self.cfg.frames_input_processed, path.basename(img))
-            if self.cfg.is_jpeg:
-                skio.imsave(dest_img, img_as_ubyte(modified), quality=self.cfg.jpeg_quality)
-            else:
-                skio.imsave(dest_img, img_as_ubyte(modified), plugin='pil')
+            ## 100, best quality for JPEG in skimage
+            skio.imsave(dest_img, img_as_ubyte(modified), quality=100)
             #### Rolling Shutter end
 
         ## set input image path for frame PTO
@@ -143,7 +141,7 @@ class OutFrames:
             line_idxs = tuple(reversed(range(num_lines)))
         else:
             line_idxs = tuple(range(num_lines))
-        
+
         #### ACROSS and ALONG lines
         if float(self.cfg.args.xy_lines) > 0:
             last_line_across = kwargs['y_move'] * float(self.cfg.args.xy_lines)
@@ -192,7 +190,7 @@ class OutFrames:
         return xy
 
 
-    def compute_camera_rotations_processed(self, vidstab_dir):
+    def compute_hugin_camera_rotations_processed(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         frames_dir = self.cfg.frames_input_processed
@@ -255,7 +253,7 @@ class OutFrames:
         ptos = sorted(os.listdir(self.cfg.hugin_projects))
         tasks = []
         for i, pto in enumerate(ptos):
-            tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.'+self.cfg.img_ext, pto))
+            tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.jpg', pto))
 
         utils.delete_files_in_dir(self.cfg.frames_stabilized)
         self.cfg.current_output_path = self.cfg.frames_stabilized
@@ -267,24 +265,15 @@ class OutFrames:
     def video(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        crf = '14'
-        ivid = path.join(self.cfg.frames_stabilized, '%06d.'+self.cfg.img_ext)
+        crf = '16'
+        ivid = path.join(self.cfg.frames_stabilized, '%06d.jpg')
         iaud = path.join(self.cfg.audio_dir, 'audio.ogg')
 
         fps = self.cfg.fps
         xy_lines = self.cfg.args.xy_lines
         roll_lines = self.cfg.args.roll_lines
 
-        if float(xy_lines) > 0 or float(roll_lines) > 0:
-            xy = self.cfg.args.xy_lines
-            roll = self.cfg.args.roll_lines
-            smooth = self.cfg.args.smoothing
-            lens_d = self.cfg.pto.lens_d or '0'
-            lens_e = self.cfg.pto.lens_e or '0'
-            fname = self.cfg.out_video_name
-            name = f'xy{xy}_r{roll}_smooth{smooth}_d{lens_d}_e{lens_e}_{fname}'
-        else:
-            name = self.cfg.out_video
+        name = self.cfg.out_video
         output = path.join(self.cfg.out_video_dir, name)
 
         if path.isfile(iaud):
@@ -301,33 +290,28 @@ class OutFrames:
                    '-an', '-y', output]
 
         run(cmd)
-        ## output video FFMPEG filter
-        self.out_filter(output)
 
 
-    def out_filter(self, videoname):
+    def ffmpeg_filter(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        filts = 'crop=iw*0.945:ih*0.945:(iw-(iw*0.945))/2:(ih-(ih*0.945))/2,scale=1920:-1,crop=floor(iw/2)*2:floor(ih/2)*2,format=yuv420p'
-        crf = '14'
-        ivid = videoname
+        w_crop = 0.91
+        h_crop = 0.93
+        w_scale = 1920
 
-        if float(self.cfg.args.xy_lines) > 0 or \
-           float(self.cfg.args.roll_lines) > 0:
-            xy = self.cfg.args.xy_lines
-            roll = self.cfg.args.roll_lines
-            smooth = self.cfg.args.smoothing
-            fname = self.cfg.out_video_filtered_name
-            name = f'xy{xy}_r{roll}_smooth{smooth}_{fname}'
-        else:
-            name = self.cfg.out_video_filtered_name
-        print(name)
-        output = path.join(self.cfg.out_video_dir, name)
+        cropf = f'crop=iw*{w_crop}:ih*{h_crop}:(iw-(iw*{w_crop}))/2:(ih-(ih*{h_crop}))/2'
+        scalef = f'scale={w_scale}:-1,crop=floor(iw/2)*2:floor(ih/2)*2'
+        pixel_format = f'yuv420p'
+        filts = f'{cropf},{scalef},format={pixel_format}'
+
+        crf = '16'
+        ivid = path.join(self.cfg.out_video_dir, self.cfg.out_video)
+        output = path.join(self.cfg.ffmpeg_filtered_dir, self.cfg.ffmpeg_filtered_name)
 
         cmd = ['ffmpeg', '-i', ivid, '-c:v', 'libx264', '-vf', filts, '-crf', crf,
                '-c:a', 'copy', '-loglevel', 'error', '-stats', '-y', output]
 
-        print('\n', cmd, '\n')
+        print(output)
 
         run(cmd)
 

@@ -24,30 +24,32 @@ class InFrames():
 
 
     def create_original_frames_and_audio(self):
+        ''' '''
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         utils.delete_files_in_dir(self.cfg.frames_input)
 
         inp = self.cfg.args.videofile
         oaud = path.join(self.cfg.audio_dir, "audio.ogg")
 
-        ## video
-        # cmd1 = ['ffmpeg', '-loglevel', 'error', '-stats', '-i', inp, '-qscale:v', '1',
-        #         path.join(self.cfg.datapath, self.cfg.frames_input, '%06d.'+self.cfg.img_ext), '-y']
+        ## audio
         cmd1 = ['ffmpeg',
                 '-loglevel', 'error',
                 '-stats',
-                '-i', inp,
-                path.join(self.cfg.frames_input, '%06d.'+self.cfg.img_ext), '-y']
+                '-i', self.cfg.args.videofile,
+                '-vn', '-aq', str(3), '-y', oaud
+        ]
 
-        ## audio
+        ## video
         cmd2 = ['ffmpeg',
                 '-loglevel', 'error',
                 '-stats',
-                '-i', self.cfg.args.videofile,
-                '-vn', '-aq', str(3), '-y', oaud]
+                '-i', inp,
+                '-qscale:v', '1',
+                path.join(self.cfg.frames_input, '%06d.jpg'), '-y'
+        ]
 
-        print(self.cfg.frames_input)
         print(oaud)
+        print(self.cfg.frames_input)
         run(cmd1)
         run(cmd2)
 
@@ -81,10 +83,14 @@ class InFrames():
         with open(path.join(self.cfg.hugin_projects, pto_name), 'w') as f:
             f.write(curr_pto_txt)
 
+        img_name = img.split('.')[:-1]
+        out_img = path.join(dest_dir, f'{img_name[0]}.jpg')
         ## run pto render
-        out_img = path.join(dest_dir, img)
         task_pto_path = path.join(self.cfg.hugin_projects, pto_name)
-        run(self.cfg.nona_opts + ['-o', out_img, task_pto_path], stdout=DEVNULL)
+        run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
+             '-o', out_img, task_pto_path],
+            stdout=DEVNULL
+        )
 
         print(out_img)
 
@@ -92,8 +98,9 @@ class InFrames():
     def create_input_video_for_vidstab(self, inp_frames_dir, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        crf = '14'
-        ivid = path.join(inp_frames_dir, '%06d.'+self.cfg.img_ext)
+        crf = '16'
+        ## projection frames are for libvidstab, in JPEG
+        ivid = path.join(inp_frames_dir, '%06d.jpg')
         output = path.join(vidstab_dir, self.cfg.projection_video_name)
         ## divisable by 2, video size required by libvidstab and other FFMPEG filters
         cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'

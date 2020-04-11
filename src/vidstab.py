@@ -63,7 +63,7 @@ class Vidstab:
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         crf = '14'
-        ivid = path.join(self.cfg.frames_input_processed, '%06d.'+self.cfg.img_ext)
+        ivid = path.join(self.cfg.frames_input_processed, '%06d.jpg')
 
         cmd = ['ffmpeg', '-framerate', self.cfg.fps, '-i', ivid,
                '-c:v', 'libx264', '-crf', crf,

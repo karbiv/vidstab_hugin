@@ -18,7 +18,8 @@ def frames_output(task):
     out_img = path.join(cfg.current_output_path, task.img)
     task_pto_path = path.join(cfg.hugin_projects, task.pto_file)
 
-    run(cfg.nona_opts + ['-o', out_img, task_pto_path], stdout=DEVNULL)
+    run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
+         '-o', out_img, task_pto_path], stdout=DEVNULL)
 
     print('Frame: {}'.format(out_img))
     if frames_crop_q:
@@ -31,7 +32,7 @@ def collect_frame_crop_data(crop_queue, base_pto):
     '''Crop doesn't require sorting, save directly to a file.'''
     cfg = config.cfg
     out_file = cfg.crops_file
-    
+
     with open(out_file, 'a') as f:
         f.seek(0)
         f.truncate()
@@ -53,4 +54,3 @@ def collect_frame_crop_data(crop_queue, base_pto):
             crop_h = round((half_crop_h-pad_h)*2)
 
             f.write('{0} {1}\n'.format(crop_w, crop_h))
-
