@@ -104,7 +104,7 @@ parser.add_argument('--stepsize', type=int, nargs='?', required=False,
                     help='Libvidstab stepsize')
 ## Rolling Shutter correction coeffs
 # xy_dflt, roll_dflt = 0, 0
-xy_dflt, roll_dflt = 0.45, 0.58
+xy_dflt, roll_dflt = 0.45, 0.53
 parser.add_argument('--xy_lines', type=float, nargs='?', required=False,
                     default=xy_dflt, #choices=range(0, 3.0),
                     help='Rolling shutter correction coefficient for translation x and y.')
@@ -144,6 +144,7 @@ if __name__ == '__main__':
         out_frms.frames()
 
         out_frms.video()
+        out_frms.ffmpeg_filter()
 
         ## end pipeline
 

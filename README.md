@@ -1,3 +1,5 @@
+TODO image warp with libvidstab
+
 
 Command line tool to stabilize shaky videos using libvidstab(shared library filter in FFMPEG) and Hugin Panorama Stitcher(Panotools).
 
@@ -11,10 +13,8 @@ https://en.wikipedia.org/wiki/Hugin_(software)
 
 # Examples:
 
-TO BE ADDED
+...
 
 # Installation
-
-TODO
 
 ...

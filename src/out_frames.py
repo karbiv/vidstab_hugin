@@ -58,7 +58,7 @@ class OutFrames:
 
         ## set center coords to lens' optical axis
         path_img = path.join(frames_dir, imgs[0])
-        sk_img = skio.imread(path_img, plugin='pil')
+        sk_img = skio.imread(path_img)
         cx, cy = np.array(sk_img.shape)[:2][::-1] / 2
         self.optical_center = cx+self.cfg.pto.lens_d, cy+self.cfg.pto.lens_e
 
@@ -99,7 +99,7 @@ class OutFrames:
         if float(self.cfg.args.xy_lines) > 0 or \
            float(self.cfg.args.roll_lines) > 0:
             #### Rolling Shutter start
-            sk_img = skio.imread(img, plugin='pil')
+            sk_img = skio.imread(img)
             projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2+t_rel.x,
                                                self.projection_pto.canvas_h/2-t_rel.y)
             orig_coords = check_output(['pano_trafo', '-r', self.cfg.projection_pto_path, '0'],
