@@ -46,6 +46,19 @@ class OutFrames:
     def compute_hugin_camera_rotations(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
+        ## check if Hugin pto files need to be updated
+        frames_pto_dir = self.cfg.hugin_projects
+        pto_files = sorted(os.listdir(frames_pto_dir))
+        global_motions = os.path.join(vidstab_dir, "global_motions.trf")        
+        if len(pto_files) and os.path.exists(global_motions) \
+           and not self.cfg.args.force:
+            path_pto = path.join(frames_pto_dir, pto_files[0])
+            frame_pto_mtime = os.path.getmtime(path_pto)
+            global_motions_mtime = os.path.getmtime(global_motions)
+            if frame_pto_mtime > global_motions_mtime:
+                print("Hugin pto project files don't need to be updated.")
+                return
+
         frames_dir = self.cfg.frames_input
         imgs = sorted(os.listdir(frames_dir))
         self.half_hfov = math.radians(self.rpto.canv_half_hfov)
@@ -54,8 +67,8 @@ class OutFrames:
 
         transforms_rel = utils.get_global_motions(vidstab_dir)
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
-        transforms_abs_filtered = utils.gauss_filter(self.cfg.fps, transforms_abs, self.cfg.args.smoothing)
-
+        transforms_abs_filtered = utils.gauss_filter(self.cfg.fps, transforms_abs,
+                                                     self.cfg.args.smoothing)
         ## set center coords to lens' optical axis
         path_img = path.join(frames_dir, imgs[0])
         sk_img = skio.imread(path_img)
@@ -68,7 +81,8 @@ class OutFrames:
             tasks.append((t[0], path_img, t[1]))
 
         self.pto_txt = utils.create_pto_txt_one_image(self.cfg.pto.filepath)
-        self.projection_pto = datatypes.HuginPTO(self.cfg.projection_pto_path)
+        if self.cfg.args.vidstab_projection != -1:
+            self.projection_pto = datatypes.HuginPTO(self.cfg.projection_pto_path)
 
         utils.delete_files_in_dir(self.cfg.hugin_projects)
         utils.delete_files_in_dir(self.cfg.frames_input_processed)
@@ -81,14 +95,21 @@ class OutFrames:
     def camera_rotations_projection_worker(self, task):
         t, img, t_rel = task[0], task[1], task[2]
 
-        ## get original coords from projection
-        projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2 + t.x,
-                                           self.projection_pto.canvas_h/2 - t.y)
-        orig_coords = check_output(['pano_trafo', '-r', self.cfg.projection_pto_path, '0'],
-                                   input=projection_coords.encode('utf-8'))
-        ## get rectilinear coords from original
-        rcoords = check_output(['pano_trafo', self.rpto.filepath, '0'], input=orig_coords).strip().split()
+        if self.cfg.args.vidstab_projection == -1:
+            orig_coords = '{} {}'.format(self.cfg.pto.orig_w/2 + t.x, self.cfg.pto.orig_h/2 - t.y)
+            ## get rectilinear coords from original
+            rcoords = check_output(['pano_trafo', self.rpto.filepath, '0'],
+                                   input=orig_coords.encode()).strip().split()
+        else:
+            ## get original coords from projection
+            projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2 + t.x,
+                                               self.projection_pto.canvas_h/2 - t.y)
+            orig_coords = check_output(['pano_trafo', '-r', self.cfg.projection_pto_path, '0'],
+                                       input=projection_coords.encode('utf-8'))
+            ## get rectilinear coords from original
+            rcoords = check_output(['pano_trafo', self.rpto.filepath, '0'], input=orig_coords).strip().split()
 
+        
         x, y = float(rcoords[0])-(self.rpto.canvas_w/2), (self.rpto.canvas_h/2)-float(rcoords[1])
 
         roll = 0-math.degrees(t.roll)
@@ -96,18 +117,22 @@ class OutFrames:
         pitch_deg = 0-math.degrees(math.atan(y*self.tan_pix))
         dest_img = img
 
-        if float(self.cfg.args.xy_lines) > 0 or \
-           float(self.cfg.args.roll_lines) > 0:
+        if float(self.cfg.args.rs_lines) > 0 or float(self.cfg.args.rs_roll) > 0:
             #### Rolling Shutter start
             sk_img = skio.imread(img)
-            projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2+t_rel.x,
-                                               self.projection_pto.canvas_h/2-t_rel.y)
-            orig_coords = check_output(['pano_trafo', '-r', self.cfg.projection_pto_path, '0'],
-                                       input=projection_coords.encode('utf-8'))
+
+            if self.cfg.args.vidstab_projection == -1:
+                orig_coords = '{} {}'.format(self.cfg.pto.orig_w/2 + t_rel.x, self.cfg.pto.orig_h/2 - t_rel.y)
+            else:
+                projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2+t_rel.x,
+                                                   self.projection_pto.canvas_h/2-t_rel.y)
+                orig_coords = check_output(['pano_trafo', '-r', self.cfg.projection_pto_path, '0'],
+                                           input=projection_coords.encode('utf-8'))
+            
             tx, ty = orig_coords.strip().split()
             orig_tx, orig_ty = float(tx) - self.cfg.pto.orig_w/2, self.cfg.pto.orig_h/2 - float(ty)
             warp_args = {'roll': t_rel.roll, 'y_move': orig_ty, 'along_move': orig_tx}
-            interpolation = int(self.cfg.args.rolling_shutter_interpolation)
+            interpolation = int(self.cfg.args.rs_interpolation)
             modified = sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
 
             dest_img = path.join(self.cfg.frames_input_processed, path.basename(img))
@@ -127,7 +152,7 @@ class OutFrames:
             f.write(curr_pto_txt)
 
         ## Show progress
-        if float(self.cfg.args.xy_lines) > 0 or float(self.cfg.args.roll_lines) > 0:
+        if float(self.cfg.args.rs_lines) > 0 or float(self.cfg.args.rs_roll) > 0:
             print(dest_img)
         else:
             print(path.join(self.cfg.hugin_projects, filepath))
@@ -143,12 +168,12 @@ class OutFrames:
             line_idxs = tuple(range(num_lines))
 
         #### ACROSS and ALONG lines
-        if float(self.cfg.args.xy_lines) > 0:
-            last_line_across = kwargs['y_move'] * float(self.cfg.args.xy_lines)
+        if float(self.cfg.args.rs_lines) > 0:
+            last_line_across = kwargs['y_move'] * float(self.cfg.args.rs_lines)
             across_delta = last_line_across / num_lines
             across_line_shift = 0
 
-            last_line_along = kwargs['along_move'] * float(self.cfg.args.xy_lines)
+            last_line_along = kwargs['along_move'] * float(self.cfg.args.rs_lines)
             along_delta = last_line_along / num_lines
             along_line_shift = 0
 
@@ -164,10 +189,10 @@ class OutFrames:
                 along_line_shift += along_delta
 
         #### ROLL lines
-        if float(self.cfg.args.roll_lines) > 0:
+        if float(self.cfg.args.rs_roll) > 0:
 
             ## Roll is in degrees
-            roll_coeff = float(self.cfg.args.roll_lines)
+            roll_coeff = float(self.cfg.args.rs_roll)
             last_line_roll = kwargs['roll'] * roll_coeff
             roll_delta = last_line_roll / num_lines
 
@@ -250,9 +275,22 @@ class OutFrames:
     def frames(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        ptos = sorted(os.listdir(self.cfg.hugin_projects))
+        ## check if update is needed
+        pto_files = sorted(os.listdir(self.cfg.hugin_projects))
+        stabilized_imgs = sorted(os.listdir(self.cfg.frames_stabilized))
+        if len(stabilized_imgs) \
+           and not self.cfg.args.force:
+            path_img = path.join(self.cfg.frames_stabilized, stabilized_imgs[0])
+            frame_mtime = os.path.getmtime(path_img)
+            path_pto = path.join(self.cfg.hugin_projects, pto_files[0])
+            pto_mtime = os.path.getmtime(path_pto)
+            if pto_mtime < frame_mtime:
+                print("Stabilized frames don't need to be updated.")
+                return
+        
+        pto_files = sorted(os.listdir(self.cfg.hugin_projects))
         tasks = []
-        for i, pto in enumerate(ptos):
+        for i, pto in enumerate(pto_files):
             tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.jpg', pto))
 
         utils.delete_files_in_dir(self.cfg.frames_stabilized)
@@ -265,16 +303,26 @@ class OutFrames:
     def video(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
+        output = path.join(self.cfg.out_video_dir, self.cfg.out_video)
+        
+        ## check if update needed
+        stabilized_imgs = sorted(os.listdir(self.cfg.frames_stabilized))
+        if os.path.exists(output) and len(stabilized_imgs) \
+           and not self.cfg.args.force:
+            output_video_mtime = os.path.getmtime(output)
+            path_img = path.join(self.cfg.frames_stabilized, stabilized_imgs[0])
+            frame_mtime = os.path.getmtime(path_img)
+            if (output_video_mtime > frame_mtime):
+                print("Input frames don't need to be updated.")
+                return
+
         crf = '16'
         ivid = path.join(self.cfg.frames_stabilized, '%06d.jpg')
         iaud = path.join(self.cfg.audio_dir, 'audio.ogg')
 
         fps = self.cfg.fps
-        xy_lines = self.cfg.args.xy_lines
-        roll_lines = self.cfg.args.roll_lines
-
-        name = self.cfg.out_video
-        output = path.join(self.cfg.out_video_dir, name)
+        rs_lines = self.cfg.args.rs_lines
+        rs_roll = self.cfg.args.rs_roll
 
         if path.isfile(iaud):
             cmd = ['ffmpeg', '-framerate', fps, '-i', ivid, '-i', iaud, '-c:v', 'libx264',

@@ -8,34 +8,23 @@ import utils
 
 class Configuration:
 
-    hugin_project_dirname = 'hugin_pto'
-    renders_dirname = 'renders'
-    is_jpeg = False
-
-
     def __init__(self, parser):
 
         args = parser.parse_args()
-        args.project = os.getcwd()
+        self.args = args
+        
+        self.project_pto = args.pto
 
-        self.project_pto = path.join(path.abspath(args.project), self.hugin_project_dirname, 'project.pto')
-
-        if not args.videofile:
-            print('PROBLEM: videofile argument is missing'); print()
-            parser.print_help()
-            exit()
-        elif not path.isfile(args.videofile):
+        if not path.isfile(args.videofile):
             print('\nFilepath doesn\'t exist: {}\n'.format(args.videofile)); exit()
         else:
             self.fps = str(round(utils.get_fps(args.videofile)))
-
+            
         self.pto = HuginPTO(self.project_pto)
-        self.args = args
 
         ## create output video subdir tree
-        ##
         data_dir_name = re.sub(r'[/\\.]+', '_', args.videofile).strip('_')
-        self.data_dir = path.join(path.abspath(args.project), self.renders_dirname, data_dir_name)
+        self.data_dir = path.join(path.abspath(args.workdir), data_dir_name)
         self.workdir = Path(path.join(self.data_dir, '0__workdir'))
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.hugin_projects = Path(path.join(self.workdir, 'hugin_ptos'))
@@ -87,6 +76,9 @@ class Configuration:
         self.ffmpeg_filtered_name = 'filtered.mkv'
         self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
         self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
+
+        ### cache info files, data in filenames
+        self.vidstab_projection_prefix = 'vidstab_projection_'
 
 
 cfg: Configuration = None

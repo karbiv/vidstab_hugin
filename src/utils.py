@@ -5,6 +5,7 @@ import re
 from subprocess import run, check_output, DEVNULL
 from math import radians as rads
 from math import degrees as degs
+from glob import glob
 import numpy as np
 import config
 import datatypes
@@ -27,8 +28,7 @@ def create_pto_txt_one_image(pto_path):
 
 
 def create_vidstab_projection_pto_file(pto_path):
-    '''
-    Hugin projections:
+    ''' Hugin projections:
     0   rectilinear
     1   cylindrical
     2   equirectangular
@@ -180,3 +180,29 @@ def get_fps(filepath):
         return float(out[0])
     elif len(out) == 2:
         return float(out[0])/float(out[1])
+
+    
+def vidstab_projection_frames_need_update():
+    cfg = config.cfg
+
+    path_prefix = f'{cfg.projection_basedir1}/{cfg.vidstab_projection_prefix}'
+    curr_info = f'{path_prefix}{cfg.args.vidstab_projection}.info'
+    info_list = glob(f'{path_prefix}*.info')
+
+    if not info_list:
+        open(curr_info, 'a').close()
+        return True
+
+    if curr_info != info_list[0]:
+        for info_file in info_list:
+            os.remove(info_file)
+        open(curr_info, 'a').close()
+        return True
+
+    inp_frames_num = len(os.listdir(cfg.frames_input))
+    pjn_frames_num = len(os.listdir(cfg.projection_dir1_frames))
+    if pjn_frames_num != inp_frames_num:
+        for info_file in info_list:
+            os.remove(info_file)
+        open(curr_info, 'a').close()
+        return True

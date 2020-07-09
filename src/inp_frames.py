@@ -24,8 +24,21 @@ class InFrames():
 
 
     def create_original_frames_and_audio(self):
-        ''' '''
+        '''Creates frame image files from a video'''
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
+        
+        ## check if input videofile was modified
+        frames_dir = self.cfg.frames_input
+        imgs = sorted(os.listdir(frames_dir))
+        if os.path.exists(self.cfg.args.videofile) and len(imgs) \
+           and not self.cfg.args.force:
+            path_img = path.join(frames_dir, imgs[0])
+            video_mtime = os.path.getmtime(self.cfg.args.videofile)
+            frame_mtime = os.path.getmtime(path_img)
+            if (video_mtime < frame_mtime):
+                print("Input frames don't need to be updated.")
+                return
+        
         utils.delete_files_in_dir(self.cfg.frames_input)
 
         inp = self.cfg.args.videofile
@@ -54,8 +67,13 @@ class InFrames():
         run(cmd2)
 
 
-    def create_projection_frames(self, frames_src_dir, dest_dir):
+    def create_projection_frames(self, frames_src_dir, dest_dir):        
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
+
+        if not utils.vidstab_projection_frames_need_update():
+            print('Projection frames for libvidstab don\'t need to be updated.')
+            return
+        
         utils.create_vidstab_projection_pto_file(self.cfg.projection_pto_path)
         self.prjn_pto_txt = utils.create_pto_txt_one_image(self.cfg.projection_pto_path)
 
@@ -102,6 +120,17 @@ class InFrames():
         ## projection frames are for libvidstab, in JPEG
         ivid = path.join(inp_frames_dir, '%06d.jpg')
         output = path.join(vidstab_dir, self.cfg.projection_video_name)
+
+        ## check if cached data needs update
+        if os.path.exists(output):
+            imgs = sorted(os.listdir(inp_frames_dir))
+            path_img = path.join(inp_frames_dir, imgs[0])
+            video_mtime = os.path.getmtime(output)
+            frame_mtime = os.path.getmtime(path_img)
+            if (video_mtime > frame_mtime):
+                print('Input video for vidstab doesn\'t need to be updated.')
+                return
+        
         ## divisable by 2, video size required by libvidstab and other FFMPEG filters
         cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
 
