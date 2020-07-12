@@ -29,6 +29,8 @@ class Configuration:
         self.workdir.mkdir(parents=True, exist_ok=True)
         self.hugin_projects = Path(path.join(self.workdir, 'hugin_ptos'))
         self.hugin_projects.mkdir(parents=True, exist_ok=True)
+        self.hugin_projects_processed = Path(path.join(self.workdir, 'hugin_ptos_processed'))
+        self.hugin_projects_processed.mkdir(parents=True, exist_ok=True)
         self.rectilinear_pto_path = path.join(self.workdir, 'rectilinear.pto')
         self.projection_pto_path = path.join(self.workdir, 'vidstab_projection.pto')
 
@@ -48,8 +50,10 @@ class Configuration:
         self.projection_basedir1.mkdir(parents=True, exist_ok=True)
         self.projection_dir1_frames = Path(path.join(self.projection_basedir1, 'frames'))
         self.projection_dir1_frames.mkdir(parents=True, exist_ok=True)
-        self.projection_dir1_vidstab = Path(path.join(self.projection_basedir1, 'vidstab_pass'))
-        self.projection_dir1_vidstab.mkdir(parents=True, exist_ok=True)
+        self.projection_dir1_vidstab_orig = Path(path.join(self.projection_basedir1, 'vidstab_pass_orig'))
+        self.projection_dir1_vidstab_orig.mkdir(parents=True, exist_ok=True)
+        self.projection_dir1_vidstab_prjn = Path(path.join(self.projection_basedir1, 'vidstab_pass_prjn'))
+        self.projection_dir1_vidstab_prjn.mkdir(parents=True, exist_ok=True)
 
         self.frames_input_processed = Path(path.join(self.data_dir, '3__original_frames_rolling_shutter'))
         self.frames_input_processed.mkdir(parents=True, exist_ok=True)
@@ -60,13 +64,13 @@ class Configuration:
 
         self.projection_dir2_frames = Path(path.join(self.projection_basedir2, 'frames'))
         self.projection_dir2_frames.mkdir(parents=True, exist_ok=True)
-        self.projection_dir2_vidstab = Path(path.join(self.projection_basedir2, 'vidstab_pass'))
-        self.projection_dir2_vidstab.mkdir(parents=True, exist_ok=True)
-
+        self.projection_dir2_vidstab_orig = Path(path.join(self.projection_basedir2, 'vidstab_pass_orig'))
+        self.projection_dir2_vidstab_orig.mkdir(parents=True, exist_ok=True)
+        self.projection_dir2_vidstab_prjn = Path(path.join(self.projection_basedir2, 'vidstab_pass_prjn'))
+        self.projection_dir2_vidstab_prjn.mkdir(parents=True, exist_ok=True)
 
         self.frames_stabilized = Path(path.join(self.data_dir, '5__stabilized_frames'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
-
 
         self.out_video_name = 'out_video.mkv'
         self.out_video_dir = Path(path.join(self.data_dir, '6__output_video'))
@@ -77,8 +81,11 @@ class Configuration:
         self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
         self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
 
+        ### command arguments
         ### cache info files, data in filenames
         self.vidstab_projection_prefix = 'vidstab_projection_'
+        self.rs_lines_prefix = 'rs_lines_'
+        self.rs_roll_prefix = 'rs_roll_'
 
 
 cfg: Configuration = None

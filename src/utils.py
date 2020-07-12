@@ -182,19 +182,20 @@ def get_fps(filepath):
         return float(out[0])/float(out[1])
 
     
-def vidstab_projection_frames_need_update():
+def vidstab_projection_frames_need_update(info_dir):
     cfg = config.cfg
 
-    path_prefix = f'{cfg.projection_basedir1}/{cfg.vidstab_projection_prefix}'
-    curr_info = f'{path_prefix}{cfg.args.vidstab_projection}.info'
-    info_list = glob(f'{path_prefix}*.info')
-
-    if not info_list:
+    
+    pathname_prefix = f'{info_dir}/{cfg.vidstab_projection_prefix}'
+    curr_info = f'{pathname_prefix}{cfg.args.vidstab_projection}.info'
+    info_files = glob(path.join(info_dir, '*.info'))
+    
+    if not info_files:
         open(curr_info, 'a').close()
         return True
 
-    if curr_info != info_list[0]:
-        for info_file in info_list:
+    if curr_info != info_files[0]:
+        for info_file in info_files:
             os.remove(info_file)
         open(curr_info, 'a').close()
         return True
@@ -202,7 +203,7 @@ def vidstab_projection_frames_need_update():
     inp_frames_num = len(os.listdir(cfg.frames_input))
     pjn_frames_num = len(os.listdir(cfg.projection_dir1_frames))
     if pjn_frames_num != inp_frames_num:
-        for info_file in info_list:
+        for info_file in info_files:
             os.remove(info_file)
         open(curr_info, 'a').close()
         return True

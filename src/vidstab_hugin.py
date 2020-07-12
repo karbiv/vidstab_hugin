@@ -180,24 +180,38 @@ if __name__ == '__main__':
         inframes.create_original_frames_and_audio()
 
         ### Step 2
+        curr_vidstab_dir = None
         if args.vidstab_projection != -1: ## -1 is default when arg is not explicit
-            inframes.create_projection_frames(cfg.frames_input, cfg.projection_dir1_frames)
-            inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames,
-                                                    cfg.projection_dir1_vidstab)
-        vidstab.analyze(cfg.projection_dir1_vidstab)
+            inframes.create_projection_frames(cfg.frames_input, cfg.projection_dir1_frames,
+                                              cfg.hugin_projects)
+            videofile = inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames,
+                                                                cfg.projection_dir1_vidstab_prjn)
+            vidstab.analyze(videofile, cfg.projection_dir1_vidstab_prjn, cfg.projection_dir1_frames)
+            curr_vidstab_dir = cfg.projection_dir1_vidstab_prjn
+        else:
+            vidstab.analyze(args.videofile, cfg.projection_dir1_vidstab_orig, cfg.frames_input)
+            curr_vidstab_dir = cfg.projection_dir1_vidstab_orig
 
         ### Step 3
-        out_frms.compute_hugin_camera_rotations(cfg.projection_dir1_vidstab)
+        ## if rolling shutter args, corrects orig frames and saves to cfg.frames_input_processed
+        out_frms.compute_hugin_camera_rotations(curr_vidstab_dir)
 
         ### Step 4
-        if float(rs_lines) > 0 or float(rs_roll) > 0: ## if Rolling Shutter correction args
+        if float(rs_lines) > 0 or float(rs_roll) > 0: # if Rolling Shutter correction args
+            curr_vidstab_dir = None
             if args.vidstab_projection != -1:
                 inframes.create_projection_frames(cfg.frames_input_processed,
-                                                  cfg.projection_dir2_frames)
-                inframes.create_input_video_for_vidstab(cfg.projection_dir2_frames,
-                                                        cfg.projection_dir2_vidstab)
-            vidstab.analyze(cfg.projection_dir2_vidstab)
-            out_frms.compute_hugin_camera_rotations_processed(cfg.projection_dir2_vidstab)
+                                                  cfg.projection_dir2_frames,
+                                                  cfg.hugin_projects_processed)
+                videofile = inframes.create_input_video_for_vidstab(cfg.projection_dir2_frames,
+                                                                    cfg.projection_dir2_vidstab_prjn)
+                vidstab.analyze(videofile, cfg.projection_dir2_vidstab_prjn, cfg.projection_dir2_frames)
+                curr_vidstab_dir = cfg.projection_dir1_vidstab_prjn
+            else:
+                vidstab.analyze(args.videofile, cfg.projection_dir2_vidstab_orig, cfg.frames_input_processed)
+                curr_vidstab_dir = cfg.projection_dir1_vidstab_orig
+
+            out_frms.compute_hugin_camera_rotations_processed(curr_vidstab_dir)
 
         ### Step 5
         out_frms.frames()
@@ -210,26 +224,35 @@ if __name__ == '__main__':
 
         ## end pipeline
 
+
+
+
+    ## TODO
+        
     elif args.step == 1:
         inframes.create_original_frames_and_audio()
     elif args.step == 2:
-        if args.vidstab_projection != -1:
-            inframes.create_projection_frames(cfg.frames_input,cfg.projection_dir1_frames)
-            inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames,
-                                                    cfg.projection_dir1_vidstab)
-        vidstab.analyze(cfg.projection_dir1_vidstab)
+        if args.vidstab_projection != -1: ## -1 is default when arg is not explicit
+            inframes.create_projection_frames(cfg.frames_input, cfg.projection_dir1_frames)
+            videofile = inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames,
+                                                                cfg.projection_dir1_vidstab)
+            vidstab.analyze(videofile, cfg.projection_dir1_vidstab)
+        else:
+            vidstab.analyze(args.videofile, cfg.projection_dir1_vidstab)
     elif args.step == 3:
         ## saves original frames with corrected rolling shutter
         out_frms.compute_hugin_camera_rotations(cfg.projection_dir1_vidstab)
     elif args.step == 4:
-        if float(rs_lines) > 0 or float(rs_roll) > 0:
+        if float(rs_lines) > 0 or float(rs_roll) > 0: ## if Rolling Shutter correction args
             if args.vidstab_projection != -1:
                 inframes.create_projection_frames(cfg.frames_input_processed,
                                                   cfg.projection_dir2_frames)
-                inframes.create_input_video_for_vidstab(cfg.projection_dir2_frames,
-                                                        cfg.projection_dir2_vidstab)
-            vidstab.analyze(cfg.projection_dir2_vidstab)
-            ## fast operation, just computes hugin camera rotations and saves PTO files
+                videofile = inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames,
+                                                                    cfg.projection_dir2_vidstab)
+                vidstab.analyze(videofile, cfg.projection_dir2_vidstab)
+            else:
+                vidstab.analyze(args.videofile, cfg.projection_dir2_vidstab)
+
             out_frms.compute_hugin_camera_rotations_processed(cfg.projection_dir2_vidstab)
     elif args.step == 5:
         out_frms.frames()

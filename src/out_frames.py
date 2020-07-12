@@ -47,12 +47,12 @@ class OutFrames:
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         ## check if Hugin pto files need to be updated
-        frames_pto_dir = self.cfg.hugin_projects
-        pto_files = sorted(os.listdir(frames_pto_dir))
+        pto_files_dir = self.cfg.hugin_projects
+        pto_files = sorted(os.listdir(pto_files_dir))
         global_motions = os.path.join(vidstab_dir, "global_motions.trf")        
         if len(pto_files) and os.path.exists(global_motions) \
            and not self.cfg.args.force:
-            path_pto = path.join(frames_pto_dir, pto_files[0])
+            path_pto = path.join(pto_files_dir, pto_files[0])
             frame_pto_mtime = os.path.getmtime(path_pto)
             global_motions_mtime = os.path.getmtime(global_motions)
             if frame_pto_mtime > global_motions_mtime:
@@ -88,7 +88,7 @@ class OutFrames:
         utils.delete_files_in_dir(self.cfg.frames_input_processed)
         frames_worker = functools.partial(camera_rotations_projection_wrap, self)
         with Pool(int(self.cfg.args.num_cpus)) as p:
-            print('Camera rotations in pto files and if enabled, rolling shutter correction:')
+            print('Camera rotations in pto files and rolling shutter correction(if enabled):')
             p.map(frames_worker, tasks)
 
 
@@ -122,7 +122,8 @@ class OutFrames:
             sk_img = skio.imread(img)
 
             if self.cfg.args.vidstab_projection == -1:
-                orig_coords = '{} {}'.format(self.cfg.pto.orig_w/2 + t_rel.x, self.cfg.pto.orig_h/2 - t_rel.y)
+                orig_coords = '{} {}'.format(self.cfg.pto.orig_w/2 + t_rel.x,
+                                             self.cfg.pto.orig_h/2 - t_rel.y)
             else:
                 projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2+t_rel.x,
                                                    self.projection_pto.canvas_h/2-t_rel.y)
@@ -133,11 +134,12 @@ class OutFrames:
             orig_tx, orig_ty = float(tx) - self.cfg.pto.orig_w/2, self.cfg.pto.orig_h/2 - float(ty)
             warp_args = {'roll': t_rel.roll, 'y_move': orig_ty, 'along_move': orig_tx}
             interpolation = int(self.cfg.args.rs_interpolation)
-            modified = sktf.warp(sk_img, self.rolling_shutter_mappings, map_args=warp_args, order=interpolation)
+            modified_orig_frame = sktf.warp(sk_img, self.rolling_shutter_mappings,
+                                            map_args=warp_args, order=interpolation)
 
             dest_img = path.join(self.cfg.frames_input_processed, path.basename(img))
             ## 100, best quality for JPEG in skimage
-            skio.imsave(dest_img, img_as_ubyte(modified), quality=100)
+            skio.imsave(dest_img, img_as_ubyte(modified_orig_frame), quality=100)
             #### Rolling Shutter end
 
         ## set input image path for frame PTO
@@ -218,6 +220,19 @@ class OutFrames:
     def compute_hugin_camera_rotations_processed(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
+        ## check if Hugin pto files need to be updated
+        pto_files_dir = self.cfg.hugin_projects_processed
+        pto_files = sorted(os.listdir(pto_files_dir))
+        global_motions = os.path.join(vidstab_dir, "global_motions.trf")        
+        if len(pto_files) and os.path.exists(global_motions) \
+           and not self.cfg.args.force:
+            path_pto = path.join(pto_files_dir, pto_files[0])
+            frame_pto_mtime = os.path.getmtime(path_pto)
+            global_motions_mtime = os.path.getmtime(global_motions)
+            if frame_pto_mtime > global_motions_mtime:
+                print("Hugin pto project files don't need to be updated.")
+                return
+
         frames_dir = self.cfg.frames_input_processed
         imgs = sorted(os.listdir(frames_dir))
         self.half_hfov = math.radians(self.rpto.canv_half_hfov)
@@ -249,7 +264,8 @@ class OutFrames:
         ## without input projection video
         orig_coords = '{} {}'.format(self.cfg.pto.orig_w/2+t.x+self.cfg.pto.lens_d,
                                      self.cfg.pto.orig_h/2-t.y+self.cfg.pto.lens_e)
-        rcoords = check_output(['pano_trafo', self.rpto.filepath, '0'], input=orig_coords.encode('utf-8')).strip().split()
+        rcoords = check_output(['pano_trafo', self.rpto.filepath, '0'],
+                               input=orig_coords.encode('utf-8')).strip().split()
 
         x, y = float(rcoords[0])-(self.rpto.canvas_w/2), (self.rpto.canvas_h/2)-float(rcoords[1])
 

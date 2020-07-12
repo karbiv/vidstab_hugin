@@ -11,18 +11,18 @@ class Vidstab:
     def __init__(self, cfg):
         self.cfg = cfg
         #self.input_video = path.join(vidstab_dir, self.cfg.projection_video_name)
-        self.input_video = self.cfg.args.videofile
+        #self.input_video = self.cfg.args.videofile
 
 
-    def analyze(self, vidstab_dir):
+    def analyze(self, input_video, vidstab_dir, frames_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         trf = 'transforms.trf'
 
         global_motions = os.path.join(vidstab_dir, "global_motions.trf")
-        imgs = sorted(os.listdir(self.cfg.projection_dir1_frames))
+        imgs = sorted(os.listdir(frames_dir))
         if os.path.exists(global_motions) \
            and not self.cfg.args.force:
-            path_img = path.join(self.cfg.projection_dir1_frames, imgs[0])
+            path_img = path.join(frames_dir, imgs[0])
             global_motions_mtime = os.path.getmtime(global_motions)
             frame_mtime = os.path.getmtime(path_img)
             if frame_mtime < global_motions_mtime:
@@ -35,7 +35,7 @@ class Vidstab:
         filts = detect.format(step, mincontrast, trf)
 
         show_detect = path.join(vidstab_dir, 'show.mkv')
-        cmd = ['ffmpeg', '-i', self.input_video, '-c:v', 'libx264', '-crf', '18',
+        cmd = ['ffmpeg', '-i', input_video, '-c:v', 'libx264', '-crf', '18',
                '-vf', filts,
                '-an', '-y',
                '-loglevel', 'error',
@@ -46,10 +46,10 @@ class Vidstab:
         run(cmd, cwd=vidstab_dir)
 
         ## saves global_motions.trf
-        self.save_global_motions_trf_file(vidstab_dir)
+        self.save_global_motions_trf_file(input_video, vidstab_dir)
 
 
-    def save_global_motions_trf_file(self, vidstab_dir):
+    def save_global_motions_trf_file(self, input_video, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
         trf = 'transforms.trf'
         out = path.join(vidstab_dir, 'stabilized.mkv')
@@ -61,7 +61,7 @@ class Vidstab:
         maxangle = 0.6 # radians
         f = 'vidstabtransform=debug=1:input={}:{}:optzoom=0:crop=black:maxangle={}'.format(trf, sm, maxangle)
 
-        cmd = ['ffmpeg', '-i', self.input_video, '-vf', f, '-c:v', 'libx264', '-crf', crf,
+        cmd = ['ffmpeg', '-i', input_video, '-vf', f, '-c:v', 'libx264', '-crf', crf,
                '-t', '00:00:00.150',
                '-an', '-y',
                '-loglevel', 'error',

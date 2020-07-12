@@ -9,8 +9,10 @@ import utils
 import datatypes
 
 
-def input_vidstab_projection_wrap(instance, frames_src_dir, dest_dir, task):
-    return instance.projection_frames_worker(task, frames_src_dir, dest_dir)
+def input_vidstab_projection_wrap(instance, frames_src_dir,
+                                  dest_dir, hugin_projects_dir, task):
+    return instance.projection_frames_worker(task, frames_src_dir,
+                                             dest_dir, hugin_projects_dir)
 
 
 class InFrames():
@@ -67,10 +69,10 @@ class InFrames():
         run(cmd2)
 
 
-    def create_projection_frames(self, frames_src_dir, dest_dir):        
+    def create_projection_frames(self, frames_src_dir, frames_dst_dir, hugin_projects_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
-        if not utils.vidstab_projection_frames_need_update():
+        if not utils.vidstab_projection_frames_need_update(frames_dst_dir.parent):
             print('Projection frames for libvidstab don\'t need to be updated.')
             return
         
@@ -82,14 +84,15 @@ class InFrames():
         for i, img in enumerate(imgs):
             tasks.append((img,))
 
-        utils.delete_files_in_dir(self.cfg.hugin_projects)
-        utils.delete_files_in_dir(dest_dir)
-        frames_worker = functools.partial(input_vidstab_projection_wrap, self, frames_src_dir, dest_dir)
+        utils.delete_files_in_dir(hugin_projects_dir)
+        utils.delete_files_in_dir(frames_dst_dir)
+        frames_worker = functools.partial(input_vidstab_projection_wrap, self,
+                                          frames_src_dir, frames_dst_dir, hugin_projects_dir)
         with Pool(int(self.cfg.args.num_cpus)) as p:
             p.map(frames_worker, tasks)
 
 
-    def projection_frames_worker(self, task, frames_src_dir, dest_dir):
+    def projection_frames_worker(self, task, frames_src_dir, dest_dir, hugin_projects_dir):
         img = task[0]
 
         src_img = path.join(frames_src_dir, img)
@@ -98,13 +101,13 @@ class InFrames():
         curr_pto_txt = re.sub(r'n".+\.(png|jpg|jpeg|tif)"', 'n"{}"'.format(src_img), self.prjn_pto_txt)
 
         pto_name = 'prjn_{}.pto'.format(img)
-        with open(path.join(self.cfg.hugin_projects, pto_name), 'w') as f:
+        with open(path.join(hugin_projects_dir, pto_name), 'w') as f:
             f.write(curr_pto_txt)
 
         img_name = img.split('.')[:-1]
         out_img = path.join(dest_dir, f'{img_name[0]}.jpg')
         ## run pto render
-        task_pto_path = path.join(self.cfg.hugin_projects, pto_name)
+        task_pto_path = path.join(hugin_projects_dir, pto_name)
         run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
              '-o', out_img, task_pto_path],
             stdout=DEVNULL
@@ -113,23 +116,23 @@ class InFrames():
         print(out_img)
 
 
-    def create_input_video_for_vidstab(self, inp_frames_dir, vidstab_dir):
+    def create_input_video_for_vidstab(self, inp_frames_dir, vidstab_dir) -> str:
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
         crf = '16'
         ## projection frames are for libvidstab, in JPEG
         ivid = path.join(inp_frames_dir, '%06d.jpg')
-        output = path.join(vidstab_dir, self.cfg.projection_video_name)
+        output_file = path.join(vidstab_dir, self.cfg.projection_video_name)
 
         ## check if cached data needs update
-        if os.path.exists(output):
+        if os.path.exists(output_file):
             imgs = sorted(os.listdir(inp_frames_dir))
             path_img = path.join(inp_frames_dir, imgs[0])
-            video_mtime = os.path.getmtime(output)
+            video_mtime = os.path.getmtime(output_file)
             frame_mtime = os.path.getmtime(path_img)
             if (video_mtime > frame_mtime):
                 print('Input video for vidstab doesn\'t need to be updated.')
-                return
+                return output_file
         
         ## divisable by 2, video size required by libvidstab and other FFMPEG filters
         cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
@@ -137,6 +140,8 @@ class InFrames():
         cmd = ['ffmpeg', '-framerate', self.cfg.fps, '-i', ivid,
                '-c:v', 'libx264', '-crf', crf,
                '-vf', cropf,
-               '-loglevel', 'error', '-stats', '-an', '-y', output]
+               '-loglevel', 'error', '-stats', '-an', '-y', output_file]
 
         run(cmd)
+
+        return output_file
