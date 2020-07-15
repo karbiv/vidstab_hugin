@@ -21,7 +21,7 @@ class Vidstab:
         global_motions = os.path.join(vidstab_dir, "global_motions.trf")
         imgs = sorted(os.listdir(frames_dir))
         if os.path.exists(global_motions) \
-           and not self.cfg.args.force:
+           and not self.cfg.args.force_upd:
             path_img = path.join(frames_dir, imgs[0])
             global_motions_mtime = os.path.getmtime(global_motions)
             frame_mtime = os.path.getmtime(path_img)
@@ -29,8 +29,8 @@ class Vidstab:
                 print("Video motions analysis doesn't need to be updated.")
                 return
 
-        step = 'stepsize='+str(self.cfg.args.stepsize)
-        mincontrast = float(self.cfg.args.mincontrast)
+        step = 'stepsize='+str(self.cfg.args.vs_stepsize)
+        mincontrast = float(self.cfg.args.vs_mincontrast)
         detect = 'vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=1'
         filts = detect.format(step, mincontrast, trf)
 

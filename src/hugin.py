@@ -15,8 +15,14 @@ frames_crop_q: Queue = None
 def frames_output(task):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
+
+    if cfg.args.vidstab_projection > -1:
+        hugin_projects_dir = cfg.hugin_projects_processed
+    else:
+        hugin_projects_dir = cfg.hugin_projects
+    
     out_img = path.join(cfg.current_output_path, task.img)
-    task_pto_path = path.join(cfg.hugin_projects, task.pto_file)
+    task_pto_path = path.join(hugin_projects_dir, task.pto_file)
 
     run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
          '-o', out_img, task_pto_path], stdout=DEVNULL)

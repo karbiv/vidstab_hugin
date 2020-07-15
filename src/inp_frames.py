@@ -33,7 +33,7 @@ class InFrames():
         frames_dir = self.cfg.frames_input
         imgs = sorted(os.listdir(frames_dir))
         if os.path.exists(self.cfg.args.videofile) and len(imgs) \
-           and not self.cfg.args.force:
+           and not self.cfg.args.force_upd:
             path_img = path.join(frames_dir, imgs[0])
             video_mtime = os.path.getmtime(self.cfg.args.videofile)
             frame_mtime = os.path.getmtime(path_img)

@@ -185,25 +185,29 @@ def get_fps(filepath):
 def vidstab_projection_frames_need_update(info_dir):
     cfg = config.cfg
 
-    
-    pathname_prefix = f'{info_dir}/{cfg.vidstab_projection_prefix}'
-    curr_info = f'{pathname_prefix}{cfg.args.vidstab_projection}.info'
-    info_files = glob(path.join(info_dir, '*.info'))
-    
-    if not info_files:
-        open(curr_info, 'a').close()
+    if cfg.args.vidstab_projection != cfg.prev_args.vidstab_projection:
         return True
 
-    if curr_info != info_files[0]:
-        for info_file in info_files:
-            os.remove(info_file)
-        open(curr_info, 'a').close()
+    num_inpt_frames = len(os.listdir(cfg.frames_input))
+    num_prjn_frames = len(os.listdir(cfg.projection_dir1_frames))
+    if num_prjn_frames != num_inpt_frames:
         return True
 
-    inp_frames_num = len(os.listdir(cfg.frames_input))
-    pjn_frames_num = len(os.listdir(cfg.projection_dir1_frames))
-    if pjn_frames_num != inp_frames_num:
-        for info_file in info_files:
-            os.remove(info_file)
-        open(curr_info, 'a').close()
+
+def rolling_shutter_args_changed():
+    cfg = config.cfg
+    args_changed = False
+
+    if cfg.args.rs_xy != cfg.prev_args.rs_xy or \
+       cfg.args.rs_roll != cfg.prev_args.rs_roll:
+        args_changed = True
+
+    return args_changed
+
+
+def args_rolling_shutter():
+    cfg = config.cfg
+    
+    if float(cfg.args.rs_xy) > 0 or float(cfg.args.rs_roll) > 0:
         return True
+    return False

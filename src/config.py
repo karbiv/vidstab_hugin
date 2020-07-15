@@ -8,11 +8,9 @@ import utils
 
 class Configuration:
 
-    def __init__(self, parser):
+    def __init__(self, args):
 
-        args = parser.parse_args()
         self.args = args
-        
         self.project_pto = args.pto
 
         if not path.isfile(args.videofile):
@@ -34,14 +32,12 @@ class Configuration:
         self.rectilinear_pto_path = path.join(self.workdir, 'rectilinear.pto')
         self.projection_pto_path = path.join(self.workdir, 'vidstab_projection.pto')
 
-
         self.input_dir = Path(path.join(self.data_dir, '1__input_frames'))
         self.input_dir.mkdir(parents=True, exist_ok=True)
         self.frames_input = Path(path.join(self.input_dir, 'original_frames'))
         self.frames_input.mkdir(parents=True, exist_ok=True)
         self.audio_dir = Path(path.join(self.input_dir, 'audio'))
         self.audio_dir.mkdir(parents=True, exist_ok=True)
-
 
         ### Lens projections
         self.projection_video_name = "input_projection.mkv"
@@ -81,11 +77,7 @@ class Configuration:
         self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
         self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
 
-        ### command arguments
-        ### cache info files, data in filenames
-        self.vidstab_projection_prefix = 'vidstab_projection_'
-        self.rs_lines_prefix = 'rs_lines_'
-        self.rs_roll_prefix = 'rs_roll_'
-
+        ## saved command args file
+        self.cmd_args = path.join(self.workdir, 'cmd_args.txt')
 
 cfg: Configuration = None

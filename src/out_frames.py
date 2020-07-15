@@ -46,13 +46,17 @@ class OutFrames:
     def compute_hugin_camera_rotations(self, vidstab_dir):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
 
+        if self.cfg.args.vidstab_projection > -1:
+            hugin_projects_dir = self.cfg.hugin_projects_processed
+        else:
+            hugin_projects_dir = self.cfg.hugin_projects
+
         ## check if Hugin pto files need to be updated
-        pto_files_dir = self.cfg.hugin_projects
-        pto_files = sorted(os.listdir(pto_files_dir))
+        pto_files = sorted(os.listdir(hugin_projects_dir))
         global_motions = os.path.join(vidstab_dir, "global_motions.trf")        
         if len(pto_files) and os.path.exists(global_motions) \
-           and not self.cfg.args.force:
-            path_pto = path.join(pto_files_dir, pto_files[0])
+           and not self.cfg.args.force_upd:
+            path_pto = path.join(hugin_projects_dir, pto_files[0])
             frame_pto_mtime = os.path.getmtime(path_pto)
             global_motions_mtime = os.path.getmtime(global_motions)
             if frame_pto_mtime > global_motions_mtime:
@@ -84,7 +88,7 @@ class OutFrames:
         if self.cfg.args.vidstab_projection != -1:
             self.projection_pto = datatypes.HuginPTO(self.cfg.projection_pto_path)
 
-        utils.delete_files_in_dir(self.cfg.hugin_projects)
+        utils.delete_files_in_dir(hugin_projects_dir)
         utils.delete_files_in_dir(self.cfg.frames_input_processed)
         frames_worker = functools.partial(camera_rotations_projection_wrap, self)
         with Pool(int(self.cfg.args.num_cpus)) as p:
@@ -94,6 +98,11 @@ class OutFrames:
 
     def camera_rotations_projection_worker(self, task):
         t, img, t_rel = task[0], task[1], task[2]
+
+        if self.cfg.args.vidstab_projection > -1:
+            hugin_projects_dir = self.cfg.hugin_projects_processed
+        else:
+            hugin_projects_dir = self.cfg.hugin_projects
 
         if self.cfg.args.vidstab_projection == -1:
             orig_coords = '{} {}'.format(self.cfg.pto.orig_w/2 + t.x, self.cfg.pto.orig_h/2 - t.y)
@@ -117,7 +126,7 @@ class OutFrames:
         pitch_deg = 0-math.degrees(math.atan(y*self.tan_pix))
         dest_img = img
 
-        if float(self.cfg.args.rs_lines) > 0 or float(self.cfg.args.rs_roll) > 0:
+        if float(self.cfg.args.rs_xy) > 0 or float(self.cfg.args.rs_roll) > 0:
             #### Rolling Shutter start
             sk_img = skio.imread(img)
 
@@ -137,6 +146,7 @@ class OutFrames:
             modified_orig_frame = sktf.warp(sk_img, self.rolling_shutter_mappings,
                                             map_args=warp_args, order=interpolation)
 
+            ## Save corrected original frame
             dest_img = path.join(self.cfg.frames_input_processed, path.basename(img))
             ## 100, best quality for JPEG in skimage
             skio.imsave(dest_img, img_as_ubyte(modified_orig_frame), quality=100)
@@ -150,32 +160,32 @@ class OutFrames:
 
         ### Write PTO project file for this frame
         filepath = '{}.pto'.format(path.basename(dest_img))
-        with open(path.join(self.cfg.hugin_projects, filepath), 'w') as f:
+        with open(path.join(hugin_projects_dir, filepath), 'w') as f:
             f.write(curr_pto_txt)
 
         ## Show progress
-        if float(self.cfg.args.rs_lines) > 0 or float(self.cfg.args.rs_roll) > 0:
+        if float(self.cfg.args.rs_xy) > 0 or float(self.cfg.args.rs_roll) > 0:
             print(dest_img)
         else:
-            print(path.join(self.cfg.hugin_projects, filepath))
+            print(path.join(hugin_projects_dir, filepath))
 
 
     def rolling_shutter_mappings(self, xy, **kwargs):
         '''Inverse map function'''
         num_lines = self.cfg.pto.orig_h
 
-        if self.cfg.args.scantop == 0:
+        if self.cfg.args.rs_scantop == 0:
             line_idxs = tuple(reversed(range(num_lines)))
         else:
             line_idxs = tuple(range(num_lines))
 
         #### ACROSS and ALONG lines
-        if float(self.cfg.args.rs_lines) > 0:
-            last_line_across = kwargs['y_move'] * float(self.cfg.args.rs_lines)
+        if float(self.cfg.args.rs_xy) > 0:
+            last_line_across = kwargs['y_move'] * float(self.cfg.args.rs_xy)
             across_delta = last_line_across / num_lines
             across_line_shift = 0
 
-            last_line_along = kwargs['along_move'] * float(self.cfg.args.rs_lines)
+            last_line_along = kwargs['along_move'] * float(self.cfg.args.rs_xy)
             along_delta = last_line_along / num_lines
             along_line_shift = 0
 
@@ -225,7 +235,7 @@ class OutFrames:
         pto_files = sorted(os.listdir(pto_files_dir))
         global_motions = os.path.join(vidstab_dir, "global_motions.trf")        
         if len(pto_files) and os.path.exists(global_motions) \
-           and not self.cfg.args.force:
+           and not self.cfg.args.force_upd:
             path_pto = path.join(pto_files_dir, pto_files[0])
             frame_pto_mtime = os.path.getmtime(path_pto)
             global_motions_mtime = os.path.getmtime(global_motions)
@@ -250,7 +260,7 @@ class OutFrames:
             path_img = path.join(frames_dir, imgs[i])
             tasks.append((t[0], path_img, t[1]))
 
-        utils.delete_files_in_dir(self.cfg.hugin_projects)
+        utils.delete_files_in_dir(self.cfg.hugin_projects_processed)
         frames_worker = functools.partial(camera_rotations_processed_wrap, self)
         with Pool(int(self.cfg.args.num_cpus)) as p:
             print('\nStart processes pool for creation of tasks.')
@@ -282,29 +292,34 @@ class OutFrames:
 
         ### Write PTO project file for this frame
         filepath = '{}.pto'.format(path.basename(dest_img))
-        with open(path.join(self.cfg.hugin_projects, filepath), 'w') as f:
+        with open(path.join(self.cfg.hugin_projects_processed, filepath), 'w') as f:
             f.write(curr_pto_txt)
 
-        print(path.join(self.cfg.hugin_projects, filepath))
+        print(path.join(self.cfg.hugin_projects_processed, filepath))
 
 
     def frames(self):
         print('\n {} \n'.format(sys._getframe().f_code.co_name))
+        
+        if self.cfg.args.vidstab_projection > -1:
+            hugin_projects_dir = self.cfg.hugin_projects_processed
+        else:
+            hugin_projects_dir = self.cfg.hugin_projects
 
         ## check if update is needed
-        pto_files = sorted(os.listdir(self.cfg.hugin_projects))
+        pto_files = sorted(os.listdir(hugin_projects_dir))
         stabilized_imgs = sorted(os.listdir(self.cfg.frames_stabilized))
         if len(stabilized_imgs) \
-           and not self.cfg.args.force:
+           and not self.cfg.args.force_upd:
             path_img = path.join(self.cfg.frames_stabilized, stabilized_imgs[0])
             frame_mtime = os.path.getmtime(path_img)
-            path_pto = path.join(self.cfg.hugin_projects, pto_files[0])
+            path_pto = path.join(hugin_projects_dir, pto_files[0])
             pto_mtime = os.path.getmtime(path_pto)
             if pto_mtime < frame_mtime:
                 print("Stabilized frames don't need to be updated.")
                 return
         
-        pto_files = sorted(os.listdir(self.cfg.hugin_projects))
+        pto_files = sorted(os.listdir(hugin_projects_dir))
         tasks = []
         for i, pto in enumerate(pto_files):
             tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.jpg', pto))
@@ -324,7 +339,7 @@ class OutFrames:
         ## check if update needed
         stabilized_imgs = sorted(os.listdir(self.cfg.frames_stabilized))
         if os.path.exists(output) and len(stabilized_imgs) \
-           and not self.cfg.args.force:
+           and not self.cfg.args.force_upd:
             output_video_mtime = os.path.getmtime(output)
             path_img = path.join(self.cfg.frames_stabilized, stabilized_imgs[0])
             frame_mtime = os.path.getmtime(path_img)
@@ -337,7 +352,7 @@ class OutFrames:
         iaud = path.join(self.cfg.audio_dir, 'audio.ogg')
 
         fps = self.cfg.fps
-        rs_lines = self.cfg.args.rs_lines
+        rs_xy = self.cfg.args.rs_xy
         rs_roll = self.cfg.args.rs_roll
 
         if path.isfile(iaud):
