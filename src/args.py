@@ -107,31 +107,9 @@ def init_cmd_args(parser):
                           metavar=f'1-5',
                           help='Interpolation in rolling shutter correction.')
 
-    ''' Hugin projections:
-        0   rectilinear
-        1   cylindrical
-        2   equirectangular
-        3   fisheye (equidistant)
-        4   stereographic
-        5   mercator
-        6   trans mercator
-        7   sinusoidal
-        8   lambert cylindrical equal area
-        9   lambert equal area azimuthal
-        10  albers equal area conic
-        11  miller cylindrical
-        12  panini
-        13  architectural
-        14  orthographic
-        15  equisolid
-        16  equirectangular panini
-        17  biplane
-        18  triplane
-        19  panini general
-        20  thoby
-        21  hammer-aitoff equal area '''
+    ''' Hugin projection number'''
     ## if set, create frames with other projection for a video to pass to vidstab
-    parser.add_argument('--vidstab-projection', type=int, nargs='?', required=False,
+    parser.add_argument('--vidstab-prjn', type=int, nargs='?', required=False,
                         default=-1,
                         choices=range(-1, 21),
                         metavar=f'0-21',
@@ -140,3 +118,7 @@ def init_cmd_args(parser):
     parser.add_argument('-f', '--force-upd', required=False,
                         action='store_true',
                         help='Flush cached files.')
+    
+    parser.add_argument('--filter', required=False,
+                        action='store_true',
+                        help='FFMPEG filtering of output.')

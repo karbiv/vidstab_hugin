@@ -5,7 +5,6 @@ import re
 from subprocess import run, check_output, DEVNULL
 from math import radians as rads
 from math import degrees as degs
-from glob import glob
 import numpy as np
 import config
 import datatypes
@@ -56,7 +55,7 @@ def create_vidstab_projection_pto_file(pto_path):
     pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
     with open(pto_path, 'w') as f:
         f.write(pto_txt)
-    projection = cfg.args.vidstab_projection
+    projection = cfg.args.vidstab_prjn
     run(['pano_modify', '-o', pto_path,
          #'--canvas={}x{}'.format(cfg.pto.canvas_w*3, cfg.pto.canvas_h*3),
          '--crop=AUTO', pto_path, '--projection='+str(projection) ], stdout=DEVNULL)
@@ -115,7 +114,7 @@ def gauss_filter(fps, transforms_abs, smooth_percent):
                 transforms_filtered[i] = sub_transforms(transforms_abs[i], avg)
 
         return transforms_filtered
-    
+
 
 def convert_relative_transforms_to_absolute(transforms_rel):
     '''Relative to absolute (integrate transformations)'''
@@ -181,33 +180,71 @@ def get_fps(filepath):
     elif len(out) == 2:
         return float(out[0])/float(out[1])
 
-    
-def vidstab_projection_frames_need_update(info_dir):
+
+def vidstab_prjn_frames_need_update(info_dir):
     cfg = config.cfg
 
-    if cfg.args.vidstab_projection != cfg.prev_args.vidstab_projection:
+    if cfg.args.vidstab_prjn != cfg.prev_args.vidstab_prjn:
         return True
 
     num_inpt_frames = len(os.listdir(cfg.frames_input))
-    num_prjn_frames = len(os.listdir(cfg.projection_dir1_frames))
+    num_prjn_frames = len(os.listdir(cfg.prjn_dir1_frames))
     if num_prjn_frames != num_inpt_frames:
         return True
 
 
 def rolling_shutter_args_changed():
     cfg = config.cfg
-    args_changed = False
 
-    if cfg.args.rs_xy != cfg.prev_args.rs_xy or \
-       cfg.args.rs_roll != cfg.prev_args.rs_roll:
-        args_changed = True
+    if cfg.args.rs_xy != cfg.prev_args.rs_xy \
+       or cfg.args.rs_roll != cfg.prev_args.rs_roll \
+           or cfg.args.rs_scantop != cfg.prev_args.rs_scantop:
+        return True
 
-    return args_changed
+    return False
 
 
 def args_rolling_shutter():
     cfg = config.cfg
-    
+
     if float(cfg.args.rs_xy) > 0 or float(cfg.args.rs_roll) > 0:
         return True
     return False
+
+
+def to_upd_camera_rotations(vidstab_dir, hugin_ptos_dir):
+    cfg = config.cfg
+
+    if cfg.args.force_upd:
+        return True
+
+    pto_files = sorted(os.listdir(hugin_ptos_dir))
+    num_inp_frames = len(os.listdir(cfg.frames_input))
+    if not pto_files or len(pto_files) != num_inp_frames:
+        return True
+    
+    pto_0 = path.join(hugin_ptos_dir, pto_files[0])
+    global_motions = os.path.join(vidstab_dir, "global_motions.trf")
+    global_motions_mtime = os.path.getmtime(global_motions)
+    pto_mtime = os.path.getmtime(pto_0)
+    if pto_mtime < global_motions_mtime:
+        return True
+
+    if args_rolling_shutter():
+        inp_frames_processed = os.listdir(cfg.frames_input_processed)
+        if not inp_frames_processed or len(inp_frames_processed) != num_inp_frames \
+           or rolling_shutter_args_changed():
+            return True
+
+        frame_0 = path.join(cfg.frames_input_processed, inp_frames_processed[0])
+        frame_mtime = os.path.getmtime(frame_0)
+        if frame_mtime < global_motions_mtime:
+            return True
+
+    return False
+
+
+def print_step(msg):
+    print()
+    print(msg)
+    print()

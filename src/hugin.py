@@ -16,7 +16,7 @@ def frames_output(task):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
 
-    if cfg.args.vidstab_projection > -1:
+    if cfg.args.vidstab_prjn > -1:
         hugin_projects_dir = cfg.hugin_projects_processed
     else:
         hugin_projects_dir = cfg.hugin_projects

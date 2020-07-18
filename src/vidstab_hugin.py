@@ -7,7 +7,7 @@ import signal
 from argparse import ArgumentParser
 import config
 import inp_frames
-import vidstab as vs
+import vidstab
 import out_frames
 import utils
 import args
@@ -25,9 +25,8 @@ def conveyor():
     cmd_args = parser.parse_args()
     cfg = config.cfg = config.Configuration(cmd_args)
 
-    out_frms = out_frames.OutFrames(cfg)
-    inframes = inp_frames.InFrames(cfg)
-    vidstab = vs.Vidstab(cfg)
+    inpt_frames = inp_frames.InFrames(cfg)
+    vs = vidstab.Vidstab(cfg)
 
     ## Cached previous command arguments
     if not path.exists(cfg.cmd_args):
@@ -38,55 +37,39 @@ def conveyor():
     args.init_cmd_args(prev_parser)
     cfg.prev_args = prev_parser.parse_args(args=args_list)
     open(cfg.cmd_args, 'w').write('\n'.join(sys.argv[1:])) # update prev args
+    ps = utils.print_step
+    
+    ps('step 1, create_original_frames_and_audio')
+    inpt_frames.create_original_frames_and_audio()
 
-    ### Conveyor start
-    ## Step 1
-    inframes.create_original_frames_and_audio()
+    
+    ps('step 2, analyze input video')
+    vs.analyze()
 
-    ## Step 2
-    curr_vidstab_dir = None
-    if cmd_args.vidstab_projection > -1:
-        inframes.create_projection_frames(cfg.frames_input, cfg.projection_dir1_frames,
-                                          cfg.hugin_projects)
-        videofile = inframes.create_input_video_for_vidstab(cfg.projection_dir1_frames,
-                                                            cfg.projection_dir1_vidstab_prjn)
-        vidstab.analyze(videofile, cfg.projection_dir1_vidstab_prjn, cfg.projection_dir1_frames)
-        curr_vidstab_dir = cfg.projection_dir1_vidstab_prjn
-    else:
-        vidstab.analyze(cmd_args.videofile, cfg.projection_dir1_vidstab_orig, cfg.frames_input)
-        curr_vidstab_dir = cfg.projection_dir1_vidstab_orig
+    
+    ps('step 3, compute_hugin_camera_rotations')
+    rectilinear_pto = utils.create_rectilinear_pto()
+    out_frms = out_frames.OutFrames(cfg, rectilinear_pto)
+    out_frms.compute_hugin_camera_rotations()
 
-    ## Step 3
-    ## if rolling shutter cmd_args, corrects orig frames and saves to cfg.frames_input_processed
-    out_frms.compute_hugin_camera_rotations(curr_vidstab_dir)
-
-    ## Step 4
+    
+    ps('step 4, rolling shutter; analyze2; compute_hugin_camera_rotations_processed')
     if utils.args_rolling_shutter() and utils.rolling_shutter_args_changed():
-        curr_vidstab_dir = None
-        if cmd_args.vidstab_projection > -1:
-            inframes.create_projection_frames(cfg.frames_input_processed,
-                                              cfg.projection_dir2_frames,
-                                              cfg.hugin_projects_processed)
-            videofile = inframes.create_input_video_for_vidstab(cfg.projection_dir2_frames,
-                                                                cfg.projection_dir2_vidstab_prjn)
-            vidstab.analyze(videofile, cfg.projection_dir2_vidstab_prjn,
-                            cfg.projection_dir2_frames)
-            curr_vidstab_dir = cfg.projection_dir1_vidstab_prjn
-        else:
-            vidstab.analyze(cmd_args.videofile, cfg.projection_dir2_vidstab_orig,
-                            cfg.frames_input_processed)
-            curr_vidstab_dir = cfg.projection_dir1_vidstab_orig
+        vidstab_dir = vs.analyze2()
+        out_frms.compute_hugin_camera_rotations_processed(vidstab_dir)
 
-        out_frms.compute_hugin_camera_rotations_processed(curr_vidstab_dir)
-
-    ## Step 5
+        
+    ps('step 5, create stabilized frames, Hugin')
     out_frms.frames()
 
-    ## Step 6
+    
+    ps('step 6, create video from stabilized frames, FFMPEG')
     out_frms.video()
 
-    ## Step 7
-    out_frms.ffmpeg_filter()
+    
+    if cfg.args.filter:
+        ps('step 7, FFMPEG filter for output video')
+        out_frms.ffmpeg_filter()
 
 
 if __name__ == '__main__':
