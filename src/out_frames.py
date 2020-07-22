@@ -16,18 +16,6 @@ import datatypes
 import utils
 
 
-def camera_rotations_wrap(instance, arg):
-    return instance.camera_rotations_worker(arg)
-
-
-def camera_rotations_projection_wrap(instance, arg):
-    return instance.camera_rotations_projection_worker(arg)
-
-
-def camera_rotations_processed_wrap(instance, arg):
-    return instance.camera_rotations_processed_worker(arg)
-
-
 class OutFrames:
 
     pto_txt: str = ''
@@ -55,7 +43,7 @@ class OutFrames:
             hugin_ptos_dir = cfg.hugin_projects
             vidstab_dir = cfg.prjn_dir1_vidstab_orig
 
-        if not utils.to_upd_camera_rotations(vidstab_dir, hugin_ptos_dir):
+        if not utils.to_upd_camera_rotations():
             return
 
         frames_dir = cfg.frames_input
@@ -85,10 +73,24 @@ class OutFrames:
 
         utils.delete_files_in_dir(hugin_ptos_dir)
         utils.delete_files_in_dir(cfg.frames_input_processed)
-        frames_worker = functools.partial(camera_rotations_projection_wrap, self)
+
         with Pool(int(cfg.args.num_cpus)) as p:
-            print('Camera rotations in pto files and rolling shutter correction(if enabled):')
-            p.map(frames_worker, tasks)
+            results = [p.apply_async(self.camera_rotations_projection_worker,
+                                     args=(t,),
+                                     callback=self.prjn_worker_callback)
+                       for t in tasks]
+            self.prjn_frames_total = len(results)
+            self.prjn_frames_cnt = 0
+            print(f'Create Hugin pto files with camera moves, {self.prjn_frames_total} frames total.\n')
+            for r in results:
+                r.get()
+            self.prjn_frames_total = 0
+            self.prjn_frames_cnt = 0
+
+
+    def prjn_worker_callback(self, r):
+        self.prjn_frames_cnt += 1
+        utils.print_progress(self.prjn_frames_cnt, self.prjn_frames_total, length=80)
 
 
     def camera_rotations_projection_worker(self, task):
@@ -96,9 +98,9 @@ class OutFrames:
         t, img, t_rel = task[0], task[1], task[2]
 
         if cfg.args.vidstab_prjn > -1:
-            hugin_projects_dir = cfg.hugin_projects_processed
+            hugin_ptos_dir = cfg.hugin_projects_processed
         else:
-            hugin_projects_dir = cfg.hugin_projects
+            hugin_ptos_dir = cfg.hugin_projects
 
         if cfg.args.vidstab_prjn == -1:
             orig_coords = '{} {}'.format(cfg.pto.orig_w/2 + t.x, cfg.pto.orig_h/2 - t.y)
@@ -158,11 +160,8 @@ class OutFrames:
 
         ### Write PTO project file for this frame
         filepath = '{}.pto'.format(path.basename(dest_img))
-        with open(path.join(hugin_projects_dir, filepath), 'w') as f:
+        with open(path.join(hugin_ptos_dir, filepath), 'w') as f:
             f.write(curr_pto_txt)
-
-        ## Show progress
-        print(path.join(hugin_projects_dir, filepath))
 
 
     def rolling_shutter_mappings(self, xy, **kwargs):
@@ -224,27 +223,12 @@ class OutFrames:
 
 
     def compute_hugin_camera_rotations_processed(self, vidstab_dir):
-        print('\n {}'.format(sys._getframe().f_code.co_name))
         cfg = self.cfg
 
-        ## check if Hugin pto files need to be updated
-        to_update = False
-        pto_files_dir = cfg.hugin_projects_processed
-        pto_files = sorted(os.listdir(pto_files_dir))
-        global_motions = os.path.join(vidstab_dir, "global_motions.trf")
-        if len(pto_files) and os.path.exists(global_motions) \
-           and not cfg.args.force_upd:
-            path_pto = path.join(pto_files_dir, pto_files[0])
-            frame_pto_mtime = os.path.getmtime(path_pto)
-            global_motions_mtime = os.path.getmtime(global_motions)
-            if frame_pto_mtime > global_motions_mtime:
-                to_update = True
-            num_inpt_frames = len(os.listdir(cfg.frames_input))
-            num_inpt_frames_processed = len(os.listdir(cfg.frames_input_processed))
-            if num_inpt_frames != num_inpt_frames_processed:
-                to_update = True
-        if not to_update:
-            return
+        if cfg.args.vidstab_prjn > -1:
+            vidstab_dir = cfg.prjn_dir1_vidstab_prjn
+        else:
+            vidstab_dir = cfg.prjn_dir1_vidstab_orig
 
         frames_dir = cfg.frames_input_processed
         imgs = sorted(os.listdir(frames_dir))
@@ -264,11 +248,20 @@ class OutFrames:
             tasks.append((t[0], path_img, t[1]))
 
         utils.delete_files_in_dir(cfg.hugin_projects_processed)
-        frames_worker = functools.partial(camera_rotations_processed_wrap, self)
+
         with Pool(int(cfg.args.num_cpus)) as p:
-            print('\nStart processes pool for creation of tasks.')
-            print('Frames camera rotations:')
-            p.map(frames_worker, tasks)
+            results = [p.apply_async(self.camera_rotations_processed_worker,
+                                     args=(t,),
+                                     callback=self.prjn_worker_callback)
+                       for t in tasks]
+            self.prjn_frames_total = len(results)
+            self.prjn_frames_cnt = 0
+            print('Rolling shutter, create Hugin pto files with camera moves, '
+                  f'{self.prjn_frames_total} frames total.\n')
+            for r in results:
+                r.get()
+            self.prjn_frames_total = 0
+            self.prjn_frames_cnt = 0
 
 
     def camera_rotations_processed_worker(self, task):
@@ -300,30 +293,28 @@ class OutFrames:
         with open(path.join(cfg.hugin_projects_processed, filepath), 'w') as f:
             f.write(curr_pto_txt)
 
-        print(path.join(cfg.hugin_projects_processed, filepath))
-
 
     def frames(self):
         cfg = self.cfg
 
         if cfg.args.vidstab_prjn > -1:
-            hugin_projects_dir = cfg.hugin_projects_processed
+            hugin_ptos_dir = cfg.hugin_projects_processed
         else:
-            hugin_projects_dir = cfg.hugin_projects
+            hugin_ptos_dir = cfg.hugin_projects
 
         ## check if update is needed
-        pto_files = sorted(os.listdir(hugin_projects_dir))
+        pto_files = sorted(os.listdir(hugin_ptos_dir))
         stabilized_imgs = sorted(os.listdir(cfg.frames_stabilized))
         if len(stabilized_imgs) \
            and not cfg.args.force_upd:
             path_img = path.join(cfg.frames_stabilized, stabilized_imgs[0])
             frame_mtime = os.path.getmtime(path_img)
-            path_pto = path.join(hugin_projects_dir, pto_files[0])
+            path_pto = path.join(hugin_ptos_dir, pto_files[0])
             pto_mtime = os.path.getmtime(path_pto)
             if pto_mtime < frame_mtime:
                 return
 
-        pto_files = sorted(os.listdir(hugin_projects_dir))
+        pto_files = sorted(os.listdir(hugin_ptos_dir))
         tasks = []
         for i, pto in enumerate(pto_files):
             tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.jpg', pto))
@@ -331,8 +322,23 @@ class OutFrames:
         utils.delete_files_in_dir(cfg.frames_stabilized)
         cfg.current_output_path = cfg.frames_stabilized
         cfg.current_pto_path = cfg.pto.filepath
+
         with Pool(int(cfg.args.num_cpus)) as p:
-            p.map(hugin.frames_output, tasks)
+            results = [p.apply_async(hugin.frames_output, args=(t,),
+                                     callback=self.prjn_worker_callback)
+                       for t in tasks]
+            self.prjn_frames_total = len(results)
+            self.prjn_frames_cnt = 0
+            print(f'Create stabilized frames for output video, {self.prjn_frames_total} frames total.\n')
+            for r in results:
+                r.get()
+            self.prjn_frames_total = 0
+            self.prjn_frames_cnt = 0
+
+
+    def prjn_worker_callback(self, r):
+        self.prjn_frames_cnt += 1
+        utils.print_progress(self.prjn_frames_cnt, self.prjn_frames_total, length=80)
 
 
     def video(self):

@@ -32,7 +32,7 @@
 # ; 5: Bi-quintic
 
 from os import path
-from argparse import ArgumentParser, Action
+from argparse import ArgumentParser, Action, SUPPRESS
 
 class VideoFileAction(Action):
     def __call__(self, parser, namespace, value, option_string=None):
@@ -122,3 +122,6 @@ def init_cmd_args(parser):
     parser.add_argument('--filter', required=False,
                         action='store_true',
                         help='FFMPEG filtering of output.')
+
+    ## dev arguments
+    parser.add_argument('--step', required=False, type=int, help=SUPPRESS, default=0)

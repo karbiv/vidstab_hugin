@@ -37,40 +37,50 @@ def conveyor():
     args.init_cmd_args(prev_parser)
     cfg.prev_args = prev_parser.parse_args(args=args_list)
     open(cfg.cmd_args, 'w').write('\n'.join(sys.argv[1:])) # update prev args
-    ps = utils.print_step
-    
-    ps('step 1, create_original_frames_and_audio')
-    inpt_frames.create_original_frames_and_audio()
 
-    
-    ps('step 2, analyze input video')
-    vs.analyze()
-
-    
-    ps('step 3, compute_hugin_camera_rotations')
     rectilinear_pto = utils.create_rectilinear_pto()
     out_frms = out_frames.OutFrames(cfg, rectilinear_pto)
-    out_frms.compute_hugin_camera_rotations()
-
     
-    ps('step 4, rolling shutter; analyze2; compute_hugin_camera_rotations_processed')
-    if utils.args_rolling_shutter() and utils.rolling_shutter_args_changed():
-        vidstab_dir = vs.analyze2()
-        out_frms.compute_hugin_camera_rotations_processed(vidstab_dir)
+    ps = utils.print_step
+    step = int(cmd_args.step)
 
-        
-    ps('step 5, create stabilized frames, Hugin')
-    out_frms.frames()
+    if step in (1, 0):
+        ps('STEP 1, create_original_frames_and_audio')
+        inpt_frames.create_original_frames_and_audio()
 
-    
-    ps('step 6, create video from stabilized frames, FFMPEG')
-    out_frms.video()
+    if step in (2, 0):
+        ps('STEP 2, analyze input video')
+        vs.analyze()
 
-    
-    if cfg.args.filter:
-        ps('step 7, FFMPEG filter for output video')
+    if step in (3, 0):
+        ps('STEP 3, compute_hugin_camera_rotations')
+        out_frms.compute_hugin_camera_rotations()
+
+    if step in (4, 0):
+        ps('STEP 4, rolling shutter; analyze2; compute_hugin_camera_rotations_processed')
+        if utils.to_upd_camera_rotations():
+            vidstab_dir = vs.analyze2()
+            out_frms.compute_hugin_camera_rotations_processed(vidstab_dir)
+
+    if step in (5, 0):
+        ps('STEP 5, create stabilized frames, Hugin')
+        out_frms.frames()
+
+    if step in (6, 0):
+        ps('STEP 6, create video from stabilized frames, FFMPEG')
+        out_frms.video()
+
+    if step in (7, 0) and cfg.args.filter:
+        ps('STEP 7, FFMPEG filter for output video')
         out_frms.ffmpeg_filter()
 
 
 if __name__ == '__main__':
     conveyor()
+
+    # import time
+    # print()
+    # total = 50
+    # for i in range(total):
+    #     time.sleep(0.1)
+    #     utils.print_progress(i+1, total, length=80)

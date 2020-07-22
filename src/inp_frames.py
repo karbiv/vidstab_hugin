@@ -1,3 +1,6 @@
+import utils
+import datatypes
+
 import os
 from os import path
 import sys
@@ -5,14 +8,6 @@ from multiprocessing import Pool
 from subprocess import run, DEVNULL
 import functools
 import re
-import utils
-import datatypes
-
-
-def input_vidstab_projection_wrap(instance, frames_src_dir,
-                                  dest_dir, hugin_projects_dir, task):
-    return instance.projection_frames_worker(task, frames_src_dir,
-                                             dest_dir, hugin_projects_dir)
 
 
 class InFrames():
@@ -27,7 +22,7 @@ class InFrames():
     def create_original_frames_and_audio(self):
         '''Creates frame image files from a video'''
         cfg = self.cfg
-        
+
         ## check if input videofile was modified
         frames_dir = cfg.frames_input
         imgs = sorted(os.listdir(frames_dir))
@@ -38,7 +33,7 @@ class InFrames():
             frame_mtime = os.path.getmtime(path_img)
             if (video_mtime < frame_mtime):
                 return
-        
+
         utils.delete_files_in_dir(cfg.frames_input)
 
         inp = cfg.args.videofile
@@ -67,12 +62,12 @@ class InFrames():
         run(cmd2)
 
 
-    def create_projection_frames(self, frames_src_dir, frames_dst_dir, hugin_projects_dir):
+    def create_projection_frames(self, frames_src_dir, frames_dst_dir, hugin_ptos_dir):
         cfg = self.cfg
 
-        if not utils.vidstab_prjn_frames_need_update(frames_dst_dir.parent):
+        if not utils.to_upd_prjn_frames(frames_src_dir, frames_dst_dir, hugin_ptos_dir):
             return
-        
+
         utils.create_vidstab_projection_pto_file(cfg.projection_pto_path)
         self.prjn_pto_txt = utils.create_pto_txt_one_image(cfg.projection_pto_path)
 
@@ -81,15 +76,29 @@ class InFrames():
         for i, img in enumerate(imgs):
             tasks.append((img,))
 
-        utils.delete_files_in_dir(hugin_projects_dir)
+        utils.delete_files_in_dir(hugin_ptos_dir)
         utils.delete_files_in_dir(frames_dst_dir)
-        frames_worker = functools.partial(input_vidstab_projection_wrap, self,
-                                          frames_src_dir, frames_dst_dir, hugin_projects_dir)
+
         with Pool(int(cfg.args.num_cpus)) as p:
-            p.map(frames_worker, tasks)
+            results = [p.apply_async(self.projection_frames_worker,
+                                     args=(t, frames_src_dir, frames_dst_dir, hugin_ptos_dir),
+                                     callback=self.prjn_worker_callback)
+                       for t in tasks]
+            self.prjn_frames_total = len(results)
+            self.prjn_frames_cnt = 0
+            print(f'Create projection frames for vidstab input video, {self.prjn_frames_total} frames total.\n')
+            for r in results:
+                r.get()
+            self.prjn_frames_total = 0
+            self.prjn_frames_cnt = 0
 
 
-    def projection_frames_worker(self, task, frames_src_dir, dest_dir, hugin_projects_dir):
+    def prjn_worker_callback(self, r):
+        self.prjn_frames_cnt += 1
+        utils.print_progress(self.prjn_frames_cnt, self.prjn_frames_total, length=80)
+
+
+    def projection_frames_worker(self, task, frames_src_dir, dest_dir, hugin_ptos_dir):
         img = task[0]
 
         src_img = path.join(frames_src_dir, img)
@@ -99,19 +108,19 @@ class InFrames():
                               self.prjn_pto_txt)
 
         pto_name = 'prjn_{}.pto'.format(img)
-        with open(path.join(hugin_projects_dir, pto_name), 'w') as f:
+        with open(path.join(hugin_ptos_dir, pto_name), 'w') as f:
             f.write(curr_pto_txt)
 
         img_name = img.split('.')[:-1]
         out_img = path.join(dest_dir, f'{img_name[0]}.jpg')
         ## run pto render
-        task_pto_path = path.join(hugin_projects_dir, pto_name)
+        task_pto_path = path.join(hugin_ptos_dir, pto_name)
         run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
              '-o', out_img, task_pto_path],
             stdout=DEVNULL
         )
 
-        print(out_img)
+        return out_img
 
 
     def create_input_video_for_vidstab(self, inp_frames_dir, vidstab_dir):
@@ -120,7 +129,7 @@ class InFrames():
         crf = '16'
         ## projection frames are for libvidstab, in JPEG
         ivid = path.join(inp_frames_dir, '%06d.jpg')
-        output_file = path.join(vidstab_dir, cfg.projection_video_name)
+        output_file = path.join(vidstab_dir, cfg.prjn_video_name)
 
         ## check if cached data needs update
         if os.path.exists(output_file):
@@ -130,7 +139,7 @@ class InFrames():
             frame_mtime = os.path.getmtime(path_img)
             if (video_mtime > frame_mtime):
                 return output_file
-        
+
         ## divisable by 2, video size required by libvidstab and other FFMPEG filters
         cropf = 'crop=floor(iw/2)*2:floor(ih/2)*2'
 

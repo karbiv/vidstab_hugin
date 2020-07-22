@@ -4,6 +4,7 @@ import sys
 from subprocess import run
 import utils
 import inp_frames
+import out_frames
 
 
 class Vidstab:
@@ -16,10 +17,11 @@ class Vidstab:
     def analyze(self):   
         trf = 'transforms.trf'
         cfg = self.cfg
-
+        
         if cfg.args.vidstab_prjn > -1:
             inpt_frames = inp_frames.InFrames(cfg)
-            inpt_frames.create_projection_frames(cfg.frames_input, cfg.prjn_dir1_frames,
+            inpt_frames.create_projection_frames(cfg.frames_input,
+                                                 cfg.prjn_dir1_frames,
                                                  cfg.hugin_projects)
             input_video = inpt_frames.create_input_video_for_vidstab(cfg.prjn_dir1_frames,
                                                                      cfg.prjn_dir1_vidstab_prjn)
@@ -111,7 +113,6 @@ class Vidstab:
 
 
     def save_global_motions_trf_file(self, input_video, vidstab_dir):
-        print('\n {}'.format(sys._getframe().f_code.co_name))
         trf = 'transforms.trf'
         out = path.join(vidstab_dir, 'stabilized.mkv')
 

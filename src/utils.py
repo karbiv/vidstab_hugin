@@ -181,16 +181,31 @@ def get_fps(filepath):
         return float(out[0])/float(out[1])
 
 
-def vidstab_prjn_frames_need_update(info_dir):
+def to_upd_prjn_frames(frames_src_dir, frames_dst_dir, hugin_ptos_dir):
     cfg = config.cfg
+
+    if cfg.args.force_upd:
+        return True
 
     if cfg.args.vidstab_prjn != cfg.prev_args.vidstab_prjn:
         return True
 
-    num_inpt_frames = len(os.listdir(cfg.frames_input))
-    num_prjn_frames = len(os.listdir(cfg.prjn_dir1_frames))
-    if num_prjn_frames != num_inpt_frames:
+    src_frames = os.listdir(frames_src_dir)
+    if not src_frames:
         return True
+    dst_frames = os.listdir(frames_dst_dir)
+    if len(dst_frames) != len(src_frames):
+        return True
+
+    ptos = os.listdir(hugin_ptos_dir)
+    pto_0 = path.join(hugin_ptos_dir, ptos[0])
+    frame_0 = path.join(frames_src_dir, src_frames[0])
+    frame_mtime = os.path.getmtime(frame_0)
+    pto_mtime = os.path.getmtime(pto_0)
+    if pto_mtime < frame_mtime:
+        return True
+
+    return False
 
 
 def rolling_shutter_args_changed():
@@ -198,7 +213,7 @@ def rolling_shutter_args_changed():
 
     if cfg.args.rs_xy != cfg.prev_args.rs_xy \
        or cfg.args.rs_roll != cfg.prev_args.rs_roll \
-           or cfg.args.rs_scantop != cfg.prev_args.rs_scantop:
+       or cfg.args.rs_scantop != cfg.prev_args.rs_scantop:
         return True
 
     return False
@@ -212,17 +227,24 @@ def args_rolling_shutter():
     return False
 
 
-def to_upd_camera_rotations(vidstab_dir, hugin_ptos_dir):
+def to_upd_camera_rotations():
     cfg = config.cfg
 
     if cfg.args.force_upd:
         return True
 
+    if cfg.args.vidstab_prjn > -1:
+        hugin_ptos_dir = cfg.hugin_projects_processed
+        vidstab_dir = cfg.prjn_dir1_vidstab_prjn
+    else:
+        hugin_ptos_dir = cfg.hugin_projects
+        vidstab_dir = cfg.prjn_dir1_vidstab_orig
+
     pto_files = sorted(os.listdir(hugin_ptos_dir))
     num_inp_frames = len(os.listdir(cfg.frames_input))
     if not pto_files or len(pto_files) != num_inp_frames:
         return True
-    
+
     pto_0 = path.join(hugin_ptos_dir, pto_files[0])
     global_motions = os.path.join(vidstab_dir, "global_motions.trf")
     global_motions_mtime = os.path.getmtime(global_motions)
@@ -248,3 +270,28 @@ def print_step(msg):
     print()
     print(msg)
     print()
+
+
+def print_progress(iteration, total, prefix = '', suffix = '', decimals = 1,
+                       length = 100, fill = '█'):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+    """
+    import sys
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filled_length = int(length * iteration // total)
+    bar = fill * filled_length + '-' * (length - filled_length)
+    print(f'{prefix} |{bar}| {percent}% {suffix}', end='')
+
+    if not iteration == total:
+        print('\r', end='')
+    else:
+        print('\n')

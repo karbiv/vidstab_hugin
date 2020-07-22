@@ -39,15 +39,15 @@ class Configuration:
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
         ### Lens projections
-        self.projection_video_name = "input_projection.mkv"
+        self.prjn_video_name = "input_projection.mkv"
 
-        self.projection_basedir1 = Path(path.join(self.data_dir, '2__lens_projection_frames_for_vidstab'))
-        self.projection_basedir1.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir1_frames = Path(path.join(self.projection_basedir1, 'frames'))
+        self.prjn_basedir1 = Path(path.join(self.data_dir, '2__lens_projection_frames_for_vidstab'))
+        self.prjn_basedir1.mkdir(parents=True, exist_ok=True)
+        self.prjn_dir1_frames = Path(path.join(self.prjn_basedir1, 'frames'))
         self.prjn_dir1_frames.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir1_vidstab_orig = Path(path.join(self.projection_basedir1, 'vidstab_pass_orig'))
+        self.prjn_dir1_vidstab_orig = Path(path.join(self.prjn_basedir1, 'vidstab_pass_orig'))
         self.prjn_dir1_vidstab_orig.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir1_vidstab_prjn = Path(path.join(self.projection_basedir1, 'vidstab_pass_prjn'))
+        self.prjn_dir1_vidstab_prjn = Path(path.join(self.prjn_basedir1, 'vidstab_pass_prjn'))
         self.prjn_dir1_vidstab_prjn.mkdir(parents=True, exist_ok=True)
 
         self.rolling_shutter = Path(path.join(self.data_dir, '3__rolling_shutter'))
@@ -56,14 +56,13 @@ class Configuration:
         self.frames_input_processed.mkdir(parents=True, exist_ok=True)
         self.rectilinear_pto_path = path.join(self.rolling_shutter, 'rectilinear.pto')
 
-        self.projection_basedir2 = Path(path.join(self.data_dir, '4__lens_projection_frames_for_vidstab'))
-        self.projection_basedir2.mkdir(parents=True, exist_ok=True)
-
-        self.prjn_dir2_frames = Path(path.join(self.projection_basedir2, 'frames'))
+        self.prjn_basedir2 = Path(path.join(self.data_dir, '4__lens_projection_frames_for_vidstab'))
+        self.prjn_basedir2.mkdir(parents=True, exist_ok=True)
+        self.prjn_dir2_frames = Path(path.join(self.prjn_basedir2, 'frames'))
         self.prjn_dir2_frames.mkdir(parents=True, exist_ok=True)
-        self.projection_dir2_vidstab_orig = Path(path.join(self.projection_basedir2, 'vidstab_pass_orig'))
-        self.projection_dir2_vidstab_orig.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir2_vidstab_prjn = Path(path.join(self.projection_basedir2, 'vidstab_pass_prjn'))
+        self.prjn_dir2_vidstab_orig = Path(path.join(self.prjn_basedir2, 'vidstab_pass_orig'))
+        self.prjn_dir2_vidstab_orig.mkdir(parents=True, exist_ok=True)
+        self.prjn_dir2_vidstab_prjn = Path(path.join(self.prjn_basedir2, 'vidstab_pass_prjn'))
         self.prjn_dir2_vidstab_prjn.mkdir(parents=True, exist_ok=True)
 
         self.frames_stabilized = Path(path.join(self.data_dir, '5__stabilized_frames'))

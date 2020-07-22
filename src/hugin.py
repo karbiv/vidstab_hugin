@@ -17,17 +17,16 @@ def frames_output(task):
     cfg = config.cfg
 
     if cfg.args.vidstab_prjn > -1:
-        hugin_projects_dir = cfg.hugin_projects_processed
+        hugin_ptos_dir = cfg.hugin_projects_processed
     else:
-        hugin_projects_dir = cfg.hugin_projects
+        hugin_ptos_dir = cfg.hugin_projects
     
     out_img = path.join(cfg.current_output_path, task.img)
-    task_pto_path = path.join(hugin_projects_dir, task.pto_file)
+    task_pto_path = path.join(hugin_ptos_dir, task.pto_file)
 
     run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
          '-o', out_img, task_pto_path], stdout=DEVNULL)
 
-    print('Frame: {}'.format(out_img))
     if frames_crop_q:
         tmp_hugp = HuginPTO(task_pto_path)
         frames_crop_q.put((tmp_hugp.crop_l, tmp_hugp.crop_r,
