@@ -261,12 +261,17 @@ def to_upd_camera_rotations(vidstab_dir):
     num_orig_frames = len(os.listdir(cfg.frames_input))
     if not pto_files or len(pto_files) != num_orig_frames:
         return True
-
+    
     pto_0 = path.join(cfg.hugin_projects, pto_files[0])
     pto_mtime = os.path.getmtime(pto_0)
     global_motions = os.path.join(vidstab_dir, "global_motions.trf")
     global_motions_mtime = os.path.getmtime(global_motions)
     if pto_mtime < global_motions_mtime:
+        return True
+    
+    main_pto = cfg.args.pto
+    main_pto_mtime = os.path.getmtime(main_pto)
+    if pto_mtime < main_pto_mtime:
         return True
 
     return False
@@ -291,6 +296,11 @@ def to_upd_camera_rotations_processed(vidstab_dir):
     global_motions_mtime = os.path.getmtime(global_motions)
     pto_mtime = os.path.getmtime(pto_0)
     if pto_mtime < global_motions_mtime:
+        return True
+
+    main_pto = cfg.args.pto
+    main_pto_mtime = os.path.getmtime(main_pto)
+    if pto_mtime < main_pto_mtime:
         return True
 
     if rolling_shutter_args_changed():
