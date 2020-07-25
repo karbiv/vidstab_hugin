@@ -1,7 +1,7 @@
 import os
 from os import path
 import sys
-from subprocess import run
+from subprocess import run, DEVNULL
 import utils
 import inp_frames
 import out_frames
@@ -14,10 +14,10 @@ class Vidstab:
         self.cfg = cfg
 
 
-    def analyze(self):   
+    def analyze(self):
         trf = 'transforms.trf'
         cfg = self.cfg
-        
+
         if cfg.args.vidstab_prjn > -1:
             inpt_frames = inp_frames.InFrames(cfg)
             inpt_frames.create_projection_frames(cfg.frames_input,
@@ -32,15 +32,8 @@ class Vidstab:
             vidstab_dir = cfg.prjn_dir1_vidstab_orig
             frames_dir = cfg.frames_input
 
-        global_motions = os.path.join(vidstab_dir, "global_motions.trf")
-        imgs = sorted(os.listdir(frames_dir))
-        if os.path.exists(global_motions) \
-           and not cfg.args.force_upd:
-            path_img = path.join(frames_dir, imgs[0])
-            global_motions_mtime = os.path.getmtime(global_motions)
-            frame_mtime = os.path.getmtime(path_img)
-            if frame_mtime < global_motions_mtime:
-                return
+        if not utils.to_upd_analyze(vidstab_dir, frames_dir):
+            return
 
         step = 'stepsize='+str(cfg.args.vs_stepsize)
         mincontrast = float(cfg.args.vs_mincontrast)
@@ -55,16 +48,23 @@ class Vidstab:
                '-stats',
                show_detect]
 
-        print(' '.join(cmd))
+        print('Vidstab analyze video camera motions')
+        if cfg.args.verbose:
+            print(' '.join(cmd))
+        print('FFMPEG output:')
         run(cmd, cwd=vidstab_dir)
+        print()
 
         ## saves global_motions.trf
         self.save_global_motions_trf_file(input_video, vidstab_dir)
 
 
-    def analyze2(self):   
+    def analyze2(self):
         trf = 'transforms.trf'
         cfg = self.cfg
+
+        if not utils.args_rolling_shutter():
+            return
 
         if cfg.args.vidstab_prjn > -1:
             inpt_frames = inp_frames.InFrames(cfg)
@@ -80,15 +80,8 @@ class Vidstab:
             vidstab_dir = cfg.prjn_dir2_vidstab_orig
             frames_dir = cfg.frames_input_processed
 
-        global_motions = os.path.join(vidstab_dir, "global_motions.trf")
-        imgs = sorted(os.listdir(frames_dir))
-        if os.path.exists(global_motions) \
-           and not cfg.args.force_upd:
-            path_img = path.join(frames_dir, imgs[0])
-            global_motions_mtime = os.path.getmtime(global_motions)
-            frame_mtime = os.path.getmtime(path_img)
-            if frame_mtime < global_motions_mtime:
-                return
+        if not utils.to_upd_analyze(vidstab_dir, frames_dir):
+            return
 
         step = 'stepsize='+str(cfg.args.vs_stepsize)
         mincontrast = float(cfg.args.vs_mincontrast)
@@ -103,22 +96,27 @@ class Vidstab:
                '-stats',
                show_detect]
 
-        print(' '.join(cmd))
-        run(cmd, cwd=vidstab_dir)
+        print('Vidstab analyze video after rolling shutter correction')
+        if cfg.args.verbose:
+            print(' '.join(cmd))
+            print('FFMPEG output:')
+            run(cmd, cwd=vidstab_dir)
+        else:
+            run(cmd, cwd=vidstab_dir, stdout=DEVNULL)
+        print()
 
         ## saves global_motions.trf
         self.save_global_motions_trf_file(input_video, vidstab_dir)
 
-        return vidstab_dir
-
 
     def save_global_motions_trf_file(self, input_video, vidstab_dir):
+        cfg = self.cfg
         trf = 'transforms.trf'
         out = path.join(vidstab_dir, 'stabilized.mkv')
 
         crf = '18'
-        smoothing_percent = int(self.cfg.args.smoothing)
-        smoothing = round((int(self.cfg.fps)/100)*smoothing_percent)
+        smoothing_percent = int(cfg.args.smoothing)
+        smoothing = round((int(cfg.fps)/100)*smoothing_percent)
         sm = 'smoothing={0}:relative=1'.format(smoothing)
         maxangle = 0.6 # radians
         f = 'vidstabtransform=debug=1:input={}:{}:optzoom=0:crop=black:maxangle={}'.\
@@ -130,8 +128,13 @@ class Vidstab:
                '-loglevel', 'error',
                '-stats',
                out]
-        print(' '.join(cmd))
+
+        print('Create global_motions.trf file, Vidstab result')
+        if cfg.args.verbose:
+            print(' '.join(cmd))
+        print('FFMPEG output:')
         run(cmd, cwd=vidstab_dir)
+        print()
 
 
     def create_processed_vidstab_input(self, output):

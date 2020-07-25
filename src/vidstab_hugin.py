@@ -43,9 +43,10 @@ def conveyor():
     
     ps = utils.print_step
     step = int(cmd_args.step)
+    print()
 
     if step in (1, 0):
-        ps('STEP 1, create_original_frames_and_audio')
+        ps('STEP 1, original frames and audio')
         inpt_frames.create_original_frames_and_audio()
 
     if step in (2, 0):
@@ -53,14 +54,14 @@ def conveyor():
         vs.analyze()
 
     if step in (3, 0):
-        ps('STEP 3, compute_hugin_camera_rotations')
+        ps('STEP 3, camera rotations in Hugin')
         out_frms.compute_hugin_camera_rotations()
 
     if step in (4, 0):
-        ps('STEP 4, rolling shutter; analyze2; compute_hugin_camera_rotations_processed')
-        if utils.to_upd_camera_rotations():
-            vidstab_dir = vs.analyze2()
-            out_frms.compute_hugin_camera_rotations_processed(vidstab_dir)
+        ps('STEP 4, rolling shutter correction(if used in args)')
+        if utils.args_rolling_shutter():
+            vs.analyze2()
+            out_frms.compute_hugin_camera_rotations_processed()
 
     if step in (5, 0):
         ps('STEP 5, create stabilized frames, Hugin')
@@ -78,9 +79,3 @@ def conveyor():
 if __name__ == '__main__':
     conveyor()
 
-    # import time
-    # print()
-    # total = 50
-    # for i in range(total):
-    #     time.sleep(0.1)
-    #     utils.print_progress(i+1, total, length=80)

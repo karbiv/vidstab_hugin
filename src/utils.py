@@ -208,6 +208,30 @@ def to_upd_prjn_frames(frames_src_dir, frames_dst_dir, hugin_ptos_dir):
     return False
 
 
+def to_upd_analyze(vidstab_dir, frames_dir):
+    cfg = config.cfg
+
+    if cfg.args.force_upd:
+        return True
+
+    global_motions = os.path.join(vidstab_dir, "global_motions.trf")
+    if not os.path.exists(global_motions):
+        return True
+    
+    imgs = sorted(os.listdir(frames_dir))
+    path_img = path.join(frames_dir, imgs[0])
+    global_motions_mtime = os.path.getmtime(global_motions)
+    frame_mtime = os.path.getmtime(path_img)
+    if frame_mtime > global_motions_mtime:
+        return True
+
+    if cfg.args.vs_mincontrast != cfg.prev_args.vs_mincontrast \
+       or cfg.args.vs_stepsize != cfg.prev_args.vs_stepsize:
+        return True
+
+    return False
+
+
 def rolling_shutter_args_changed():
     cfg = config.cfg
 
@@ -227,47 +251,56 @@ def args_rolling_shutter():
     return False
 
 
-def to_upd_camera_rotations():
+def to_upd_camera_rotations(vidstab_dir):
     cfg = config.cfg
 
     if cfg.args.force_upd:
         return True
 
-    if cfg.args.vidstab_prjn > -1:
-        hugin_ptos_dir = cfg.hugin_projects_processed
-        vidstab_dir = cfg.prjn_dir1_vidstab_prjn
-    else:
-        hugin_ptos_dir = cfg.hugin_projects
-        vidstab_dir = cfg.prjn_dir1_vidstab_orig
+    pto_files = sorted(os.listdir(cfg.hugin_projects))
+    num_orig_frames = len(os.listdir(cfg.frames_input))
+    if not pto_files or len(pto_files) != num_orig_frames:
+        return True
 
-    pto_files = sorted(os.listdir(hugin_ptos_dir))
-    num_inp_frames = len(os.listdir(cfg.frames_input))
+    pto_0 = path.join(cfg.hugin_projects, pto_files[0])
+    pto_mtime = os.path.getmtime(pto_0)
+    global_motions = os.path.join(vidstab_dir, "global_motions.trf")
+    global_motions_mtime = os.path.getmtime(global_motions)
+    if pto_mtime < global_motions_mtime:
+        return True
+
+    return False
+
+
+def to_upd_camera_rotations_processed(vidstab_dir):
+    cfg = config.cfg
+
+    if not args_rolling_shutter():
+        return False
+    
+    if cfg.args.force_upd:
+        return True
+
+    pto_files = sorted(os.listdir(cfg.hugin_projects_processed))
+    num_inp_frames = len(os.listdir(cfg.frames_input_processed))
     if not pto_files or len(pto_files) != num_inp_frames:
         return True
 
-    pto_0 = path.join(hugin_ptos_dir, pto_files[0])
+    pto_0 = path.join(cfg.hugin_projects_processed, pto_files[0])
     global_motions = os.path.join(vidstab_dir, "global_motions.trf")
     global_motions_mtime = os.path.getmtime(global_motions)
     pto_mtime = os.path.getmtime(pto_0)
     if pto_mtime < global_motions_mtime:
         return True
 
-    if args_rolling_shutter():
-        inp_frames_processed = os.listdir(cfg.frames_input_processed)
-        if not inp_frames_processed or len(inp_frames_processed) != num_inp_frames \
-           or rolling_shutter_args_changed():
-            return True
-
-        frame_0 = path.join(cfg.frames_input_processed, inp_frames_processed[0])
-        frame_mtime = os.path.getmtime(frame_0)
-        if frame_mtime < global_motions_mtime:
-            return True
+    if rolling_shutter_args_changed():
+        return True
 
     return False
 
 
 def print_step(msg):
-    print()
+    print('_______')
     print(msg)
     print()
 

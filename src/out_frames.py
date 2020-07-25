@@ -37,17 +37,14 @@ class OutFrames:
         cfg = self.cfg
 
         if cfg.args.vidstab_prjn > -1:
-            hugin_ptos_dir = cfg.hugin_projects_processed
             vidstab_dir = cfg.prjn_dir1_vidstab_prjn
         else:
-            hugin_ptos_dir = cfg.hugin_projects
             vidstab_dir = cfg.prjn_dir1_vidstab_orig
 
-        if not utils.to_upd_camera_rotations():
+        if not utils.to_upd_camera_rotations(vidstab_dir):
             return
 
-        frames_dir = cfg.frames_input
-        imgs = sorted(os.listdir(frames_dir))
+        imgs = sorted(os.listdir(cfg.frames_input))
         self.half_hfov = math.radians(self.rectilinear_pto.canv_half_hfov)
         horizont_tan = math.tan(self.half_hfov)
         self.tan_pix = horizont_tan/(self.rectilinear_pto.canvas_w/2)
@@ -57,21 +54,21 @@ class OutFrames:
         transforms_abs_filtered = utils.gauss_filter(cfg.fps, transforms_abs,
                                                      cfg.args.smoothing)
         ## set center coords to lens' optical axis
-        path_img = path.join(frames_dir, imgs[0])
+        path_img = path.join(cfg.frames_input, imgs[0])
         sk_img = skio.imread(path_img)
         cx, cy = np.array(sk_img.shape)[:2][::-1] / 2
         self.optical_center = cx+cfg.pto.lens_d, cy+cfg.pto.lens_e
 
         tasks = []
         for i, t in enumerate(zip(transforms_abs_filtered, transforms_rel)):
-            path_img = path.join(frames_dir, imgs[i])
+            path_img = path.join(cfg.frames_input, imgs[i])
             tasks.append((t[0], path_img, t[1]))
 
         self.pto_txt = utils.create_pto_txt_one_image(cfg.pto.filepath)
         if cfg.args.vidstab_prjn != -1:
             self.projection_pto = datatypes.HuginPTO(cfg.projection_pto_path)
 
-        utils.delete_files_in_dir(hugin_ptos_dir)
+        utils.delete_files_in_dir(cfg.hugin_projects)
         utils.delete_files_in_dir(cfg.frames_input_processed)
 
         with Pool(int(cfg.args.num_cpus)) as p:
@@ -97,11 +94,6 @@ class OutFrames:
         cfg = self.cfg
         t, img, t_rel = task[0], task[1], task[2]
 
-        if cfg.args.vidstab_prjn > -1:
-            hugin_ptos_dir = cfg.hugin_projects_processed
-        else:
-            hugin_ptos_dir = cfg.hugin_projects
-
         if cfg.args.vidstab_prjn == -1:
             orig_coords = '{} {}'.format(cfg.pto.orig_w/2 + t.x, cfg.pto.orig_h/2 - t.y)
             ## get rectilinear coords from original
@@ -116,7 +108,6 @@ class OutFrames:
             ## get rectilinear coords from original
             rcoords = check_output(['pano_trafo', self.rectilinear_pto.filepath, '0'],
                                    input=orig_coords).strip().split()
-
 
         x = float(rcoords[0])-(self.rectilinear_pto.canvas_w/2)
         y = (self.rectilinear_pto.canvas_h/2)-float(rcoords[1])
@@ -160,7 +151,7 @@ class OutFrames:
 
         ### Write PTO project file for this frame
         filepath = '{}.pto'.format(path.basename(dest_img))
-        with open(path.join(hugin_ptos_dir, filepath), 'w') as f:
+        with open(path.join(cfg.hugin_projects, filepath), 'w') as f:
             f.write(curr_pto_txt)
 
 
@@ -222,13 +213,16 @@ class OutFrames:
         return xy
 
 
-    def compute_hugin_camera_rotations_processed(self, vidstab_dir):
+    def compute_hugin_camera_rotations_processed(self):
         cfg = self.cfg
 
         if cfg.args.vidstab_prjn > -1:
-            vidstab_dir = cfg.prjn_dir1_vidstab_prjn
+            vidstab_dir = cfg.prjn_dir2_vidstab_prjn
         else:
-            vidstab_dir = cfg.prjn_dir1_vidstab_orig
+            vidstab_dir = cfg.prjn_dir2_vidstab_orig
+
+        if not utils.to_upd_camera_rotations_processed(vidstab_dir):
+            return
 
         frames_dir = cfg.frames_input_processed
         imgs = sorted(os.listdir(frames_dir))
@@ -377,7 +371,11 @@ class OutFrames:
                    '-stats',
                    '-an', '-y', output]
 
+        if cfg.args.verbose:
+            print(' '.join(cmd))
+        print('FFMPEG output:')
         run(cmd)
+        print()
 
 
     def ffmpeg_filter(self):

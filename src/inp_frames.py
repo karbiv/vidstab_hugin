@@ -148,6 +148,9 @@ class InFrames():
                '-vf', cropf,
                '-loglevel', 'error', '-stats', '-an', '-y', output_file]
 
+        print('Create input video for vidstab')
+        print('FFMPEG output:')
         run(cmd)
+        print()    
 
         return output_file

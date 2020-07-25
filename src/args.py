@@ -80,7 +80,7 @@ def init_cmd_args(parser):
     vidstab_group = parser.add_argument_group('libvidstab arguments')
 
     vidstab_group.add_argument('--vs-mincontrast', type=float, nargs='?', required=False,
-                               default=0.3,
+                               default=0.4,
                                metavar=f'0.1 ... 1.0',
                                help='Libvidstab mincontrast')
 
@@ -125,3 +125,7 @@ def init_cmd_args(parser):
 
     ## dev arguments
     parser.add_argument('--step', required=False, type=int, help=SUPPRESS, default=0)
+
+    parser.add_argument('-v', '--verbose', required=False,
+                        default=False, action='store_true',
+                        help='Show info message, FFMPEG option')
