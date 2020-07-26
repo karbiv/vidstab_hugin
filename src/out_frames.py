@@ -384,34 +384,24 @@ class OutFrames:
     def ffmpeg_filter(self):
         cfg = self.cfg
 
-        w_crop = 0.91
-        h_crop = 0.93
-        w_scale = 1920
+        parts = cfg.args.outfilter.split(':')
+        w_crop, h_crop, w_size = float(parts[0]), float(parts[1]), int(parts[2])
 
         cropf = f'crop=iw*{w_crop}:ih*{h_crop}:(iw-(iw*{w_crop}))/2:(ih-(ih*{h_crop}))/2'
-        scalef = f'scale={w_scale}:-1,crop=floor(iw/2)*2:floor(ih/2)*2'
+        scalef = f'scale={w_size}:-1,crop=floor(iw/2)*2:floor(ih/2)*2'
         pixel_format = f'yuv420p'
         filts = f'{cropf},{scalef},format={pixel_format}'
 
         crf = '16'
         ivid = path.join(cfg.out_video_dir, cfg.out_video)
-        output = path.join(cfg.ffmpeg_filtered_dir, cfg.ffmpeg_filtered_name)
+        
+        import re
+        out_name = re.sub(r'[/\\]', '_', cfg.args.videofile).strip('_')+'.mkv'
+        output = path.join(cfg.ffmpeg_filtered_dir, out_name)
 
         cmd = ['ffmpeg', '-i', ivid, '-c:v', 'libx264', '-vf', filts, '-crf', crf,
                '-c:a', 'copy', '-loglevel', 'error', '-stats', '-y', output]
 
-        print(output)
+        print(out_name)
 
         run(cmd)
-
-
-    def cleanup(self):
-        print('\n {}'.format(sys._getframe().f_code.co_name))
-        cfg = self.cfg
-
-        utils.delete_files_in_dir(cfg.frames_input)
-        utils.delete_files_in_dir(cfg.frames_projection)
-        utils.delete_files_in_dir(cfg.frames_stabilized)
-        utils.delete_files_in_dir(cfg.hugin_projects)
-
-        utils.delete_filepath(cfg.out_video)

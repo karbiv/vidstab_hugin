@@ -1,4 +1,3 @@
-
 # ;;; Hugin projection numbers used
 # ; 0   rectilinear
 # ; 1   cylindrical
@@ -49,7 +48,6 @@ num_cpus_default = 4
 default_smoothing_percent_of_fps = 83
 stepsize = 6
 xy_dflt, roll_dflt = 0, 0
-#xy_dflt, roll_dflt = 0.45, 0.64
 
 def init_cmd_args(parser):
     pos_group = parser.add_argument_group('positional arguments')
@@ -108,7 +106,7 @@ def init_cmd_args(parser):
                           metavar=f'1-5',
                           help='Interpolation in rolling shutter correction.')
 
-    ''' Hugin projection number'''
+    '''Hugin projection number'''
     ## if set, create frames with other projection for a video to pass to vidstab
     parser.add_argument('--vidstab-prjn', type=int, nargs='?', required=False,
                         default=-1,
@@ -116,13 +114,18 @@ def init_cmd_args(parser):
                         metavar=f'0-21',
                         help='Hugin projection number.')
 
-    parser.add_argument('-f', '--force-upd', required=False,
+    parser.add_argument('--force-upd', required=False,
                         action='store_true',
                         help='Flush cached files.')
-    
-    parser.add_argument('--filter', required=False,
-                        action='store_true',
-                        help='FFMPEG filtering of output.')
+
+    parser.add_argument('--outfilter', type=str, nargs='?', required=False,
+                        default='',
+                        metavar="'w_crop_coeff:h_crop_coeff:width_pixels'",
+                        help="""FFMPEG crop/scale filtering of a rendered video.
+String of 3 numbers separated by colon(':').
+'width_crop_coeff:height_crop_coeff:width_pixels'
+Crop multipliers are equal or less than 1.0, width and height are multiplied by coeffs to define inner rectangle to crop.
+'width_pixels' defines pixel width an out video is scaled to.""")
 
     ## dev arguments
     parser.add_argument('--step', required=False, type=int, help=SUPPRESS, default=0)

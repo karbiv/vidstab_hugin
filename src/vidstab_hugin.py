@@ -22,7 +22,7 @@ args.init_cmd_args(parser)
 
 
 def conveyor():
-    cmd_args = parser.parse_args()
+    cmd_args, unknown_args = parser.parse_known_args()
     cfg = config.cfg = config.Configuration(cmd_args)
 
     inpt_frames = inp_frames.InFrames(cfg)
@@ -32,10 +32,11 @@ def conveyor():
     if not path.exists(cfg.cmd_args):
         cmd_args.force_upd = True
         open(cfg.cmd_args, 'w').write('\n'.join(sys.argv[1:]))
+
     args_list = open(cfg.cmd_args, 'r').read().splitlines()
     prev_parser = ArgumentParser(description='Previous arguments')
     args.init_cmd_args(prev_parser)
-    cfg.prev_args = prev_parser.parse_args(args=args_list)
+    cfg.prev_args, unknown_args_prev = prev_parser.parse_known_args(args=args_list)
     open(cfg.cmd_args, 'w').write('\n'.join(sys.argv[1:])) # update prev args
 
     rectilinear_pto = utils.create_rectilinear_pto()
@@ -73,7 +74,7 @@ def conveyor():
         ps('STEP 6, create video from stabilized frames, FFMPEG')
         out_frms.video()
 
-    if step in (7, 0) and cfg.args.filter:
+    if step in (7, 0) and cfg.args.outfilter:
         ps('STEP 7, FFMPEG filter for output video')
         out_frms.ffmpeg_filter()
 

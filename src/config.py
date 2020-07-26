@@ -73,7 +73,6 @@ class Configuration:
         self.out_video_dir.mkdir(parents=True, exist_ok=True)
         self.out_video = path.join(self.out_video_dir, self.out_video_name)
 
-        self.ffmpeg_filtered_name = 'filtered.mkv'
         self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
         self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
 
