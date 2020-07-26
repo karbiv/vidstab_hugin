@@ -46,22 +46,24 @@ def conveyor():
     print()
 
     if step in (1, 0):
-        ps('STEP 1, original frames and audio')
+        ps('STEP 1, original frames and audio.')
         inpt_frames.create_original_frames_and_audio()
 
     if step in (2, 0):
-        ps('STEP 2, analyze input video')
+        ps('STEP 2, analyze cam motions in input video.')
         vs.analyze()
 
     if step in (3, 0):
-        ps('STEP 3, camera rotations in Hugin')
+        ps('STEP 3, camera rotations in Hugin.')
         out_frms.compute_hugin_camera_rotations()
 
     if step in (4, 0):
-        ps('STEP 4, rolling shutter correction(if used in args)')
         if utils.args_rolling_shutter():
+            ps('STEP 4, analyze cam motions in video with corrected Rolling Shutter.')
             vs.analyze2()
             out_frms.compute_hugin_camera_rotations_processed()
+        else:
+            ps('STEP 4, SKIP(analyze cam motions in video with corrected Rolling Shutter).')
 
     if step in (5, 0):
         ps('STEP 5, create stabilized frames, Hugin')

@@ -43,7 +43,7 @@ class VideoFileAction(Action):
         setattr(namespace, self.dest, path.abspath(value[0]))
 
 
-max_cpus = 16
+max_cpus = 32
 max_smoothing = 128
 num_cpus_default = 4
 default_smoothing_percent_of_fps = 83
@@ -91,8 +91,9 @@ def init_cmd_args(parser):
 
     rs_group = parser.add_argument_group('rolling shutter')
 
-    rs_group.add_argument('--rs-scantop', type=int, nargs='?', required=False,
-                          default=0, choices=[0, 1],
+    rs_group.add_argument('--rs-scantop', required=False,
+                          action='store_true',
+                          default=False,
                           help='Scanning direction of lines in the CMOS image sensor: 0=bottom-up, 1=top-down.'
                           'Depends on how the camera was held when shooting.')
 

@@ -257,6 +257,12 @@ def to_upd_camera_rotations(vidstab_dir):
     if cfg.args.force_upd:
         return True
 
+    if rolling_shutter_args_changed():
+        return True
+
+    if cfg.args.smoothing != cfg.prev_args.smoothing:
+        return True
+
     pto_files = sorted(os.listdir(cfg.hugin_projects))
     num_orig_frames = len(os.listdir(cfg.frames_input))
     if not pto_files or len(pto_files) != num_orig_frames:
@@ -286,6 +292,9 @@ def to_upd_camera_rotations_processed(vidstab_dir):
     if cfg.args.force_upd:
         return True
 
+    if cfg.args.smoothing != cfg.prev_args.smoothing:
+        return True
+
     pto_files = sorted(os.listdir(cfg.hugin_projects_processed))
     num_inp_frames = len(os.listdir(cfg.frames_input_processed))
     if not pto_files or len(pto_files) != num_inp_frames:
@@ -301,9 +310,6 @@ def to_upd_camera_rotations_processed(vidstab_dir):
     main_pto = cfg.args.pto
     main_pto_mtime = os.path.getmtime(main_pto)
     if pto_mtime < main_pto_mtime:
-        return True
-
-    if rolling_shutter_args_changed():
         return True
 
     return False
@@ -329,7 +335,7 @@ def print_progress(iteration, total, prefix = '', suffix = '', decimals = 1,
         fill        - Optional  : bar fill character (Str)
     """
     import sys
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)+0.0000001))
     filled_length = int(length * iteration // total)
     bar = fill * filled_length + '-' * (length - filled_length)
     print(f'{prefix} |{bar}| {percent}% {suffix}', end='')

@@ -44,6 +44,9 @@ class OutFrames:
         if not utils.to_upd_camera_rotations(vidstab_dir):
             return
 
+        if utils.args_rolling_shutter():
+            print('Create input frames with corrected Rolling Shutter.')
+
         imgs = sorted(os.listdir(cfg.frames_input))
         self.half_hfov = math.radians(self.rectilinear_pto.canv_half_hfov)
         horizont_tan = math.tan(self.half_hfov)
@@ -160,10 +163,10 @@ class OutFrames:
         cfg = self.cfg
         num_lines = cfg.pto.orig_h
 
-        if cfg.args.rs_scantop == 0:
-            line_idxs = tuple(reversed(range(num_lines)))
-        else:
+        if cfg.args.rs_scantop:
             line_idxs = tuple(range(num_lines))
+        else:
+            line_idxs = tuple(reversed(range(num_lines)))
 
         #### ACROSS and ALONG lines
         if float(cfg.args.rs_xy) > 0:
