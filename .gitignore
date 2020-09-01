@@ -2,6 +2,8 @@
 # to keep empty data dirs
 !**.gitignore
 
+.venv
+
 __pycache__
 *.mkv
 *.mp4
