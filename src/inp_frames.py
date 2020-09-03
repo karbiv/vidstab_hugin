@@ -19,12 +19,12 @@ class InFrames():
         self.cfg = cfg
 
 
-    def create_original_frames_and_audio(self):
+    def store_input_frames(self):
         '''Creates frame image files from a video'''
         cfg = self.cfg
 
         ## check if input videofile was modified
-        frames_dir = cfg.frames_input
+        frames_dir = cfg.input_dir
         imgs = sorted(os.listdir(frames_dir))
         if os.path.exists(cfg.args.videofile) and len(imgs) \
            and not cfg.args.force_upd:
@@ -34,32 +34,20 @@ class InFrames():
             if (video_mtime < frame_mtime):
                 return
 
-        utils.delete_files_in_dir(cfg.frames_input)
+        utils.delete_files_in_dir(cfg.input_dir)
 
         inp = cfg.args.videofile
-        oaud = path.join(cfg.audio_dir, "audio.ogg")
 
-        ## audio
-        cmd1 = ['ffmpeg',
-                '-loglevel', 'error',
-                '-stats',
-                '-i', cfg.args.videofile,
-                '-vn', '-aq', str(3), '-y', oaud
-        ]
-
-        ## video
-        cmd2 = ['ffmpeg',
+        cmd = ['ffmpeg',
                 '-loglevel', 'error',
                 '-stats',
                 '-i', inp,
                 '-qscale:v', '1',
-                path.join(cfg.frames_input, '%06d.jpg'), '-y'
+                path.join(cfg.input_dir, '%06d.jpg'), '-y'
         ]
 
-        print(oaud)
-        print(cfg.frames_input)
-        run(cmd1)
-        run(cmd2)
+        print(f'Store frames of {cfg.args.videofile}')
+        run(cmd, check=True)
 
 
     def create_projection_frames(self, frames_src_dir, frames_dst_dir, hugin_ptos_dir):
@@ -79,14 +67,14 @@ class InFrames():
         utils.delete_files_in_dir(hugin_ptos_dir)
         utils.delete_files_in_dir(frames_dst_dir)
 
+        self.prjn_frames_total = len(tasks)
+        self.prjn_frames_cnt = 0
         with Pool(int(cfg.args.num_cpus)) as p:
             results = [p.apply_async(self.projection_frames_worker,
                                      args=(t, frames_src_dir, frames_dst_dir, hugin_ptos_dir),
                                      callback=self.prjn_worker_callback)
                        for t in tasks]
-            self.prjn_frames_total = len(results)
-            self.prjn_frames_cnt = 0
-            print(f'Create projection frames for vidstab input video, {self.prjn_frames_total} frames total.\n')
+            print(f'Create projection frames for vidstab input video, {self.prjn_frames_total} frames total.')
             for r in results:
                 r.get()
             self.prjn_frames_total = 0
@@ -149,7 +137,6 @@ class InFrames():
                '-loglevel', 'error', '-stats', '-an', '-y', output_file]
 
         print('Create input video for vidstab')
-        print('FFMPEG output:')
         run(cmd)
         print()    
 

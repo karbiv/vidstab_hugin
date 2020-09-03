@@ -20,7 +20,7 @@ class Vidstab:
 
         if cfg.args.vidstab_prjn > -1:
             inpt_frames = inp_frames.InFrames(cfg)
-            inpt_frames.create_projection_frames(cfg.frames_input,
+            inpt_frames.create_projection_frames(cfg.input_dir,
                                                  cfg.prjn_dir1_frames,
                                                  cfg.hugin_projects)
             input_video = inpt_frames.create_input_video_for_vidstab(cfg.prjn_dir1_frames,
@@ -30,7 +30,7 @@ class Vidstab:
         else:
             input_video = cfg.args.videofile
             vidstab_dir = cfg.prjn_dir1_vidstab_orig
-            frames_dir = cfg.frames_input
+            frames_dir = cfg.input_dir
 
         if not utils.to_upd_analyze(vidstab_dir, frames_dir):
             return
@@ -48,10 +48,9 @@ class Vidstab:
                '-stats',
                show_detect]
 
-        print('Vidstab analyze video camera motions')
+        print('Analyze cam motions in video (libvidstab)')
         if cfg.args.verbose:
             print(' '.join(cmd))
-        print('FFMPEG output:')
         run(cmd, cwd=vidstab_dir)
         print()
 
@@ -129,12 +128,12 @@ class Vidstab:
                '-stats',
                out]
 
-        print('Create global_motions.trf file, Vidstab result')
+        print("Create global_motions.trf file, libvidstab's result")
         if cfg.args.verbose:
             print(' '.join(cmd))
-        print('FFMPEG output:')
-        run(cmd, cwd=vidstab_dir)
-        print()
+        run(cmd, cwd=vidstab_dir,
+            check=True,
+            capture_output=True)
 
 
     def create_processed_vidstab_input(self, output):

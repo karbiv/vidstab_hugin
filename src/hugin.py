@@ -16,7 +16,7 @@ def frames_output(task):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
 
-    if cfg.args.vidstab_prjn > -1:
+    if utils.args_rolling_shutter():
         hugin_ptos_dir = cfg.hugin_projects_processed
     else:
         hugin_ptos_dir = cfg.hugin_projects

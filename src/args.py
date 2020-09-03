@@ -43,7 +43,7 @@ class VideoFileAction(Action):
 
 
 max_cpus = 32
-max_smoothing = 128
+max_smoothing = 200
 num_cpus_default = 4
 default_smoothing_percent_of_fps = 83
 stepsize = 6
@@ -133,3 +133,7 @@ Crop multipliers are equal or less than 1.0, width and height are multiplied by 
     parser.add_argument('-v', '--verbose', required=False,
                         default=False, action='store_true',
                         help='Show info message, FFMPEG option')
+
+    parser.add_argument('--with-audio', required=False, default=False,
+                        action='store_true',
+                        help='Copy audio stream(if exists) from input video to output video.')

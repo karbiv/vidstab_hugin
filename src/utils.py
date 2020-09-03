@@ -264,7 +264,7 @@ def to_upd_camera_rotations(vidstab_dir):
         return True
 
     pto_files = sorted(os.listdir(cfg.hugin_projects))
-    num_orig_frames = len(os.listdir(cfg.frames_input))
+    num_orig_frames = len(os.listdir(cfg.input_dir))
     if not pto_files or len(pto_files) != num_orig_frames:
         return True
     
@@ -335,7 +335,7 @@ def print_progress(iteration, total, prefix = '', suffix = '', decimals = 1,
         fill        - Optional  : bar fill character (Str)
     """
     import sys
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)+0.0000001))
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / total))
     filled_length = int(length * iteration // total)
     bar = fill * filled_length + '-' * (length - filled_length)
     print(f'{prefix} |{bar}| {percent}% {suffix}', end='')

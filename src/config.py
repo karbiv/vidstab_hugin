@@ -1,4 +1,3 @@
-import os
 from os import path
 import re
 from pathlib import Path
@@ -17,7 +16,7 @@ class Configuration:
             print('\nFilepath doesn\'t exist: {}\n'.format(args.videofile)); exit()
         else:
             self.fps = str(round(utils.get_fps(args.videofile)))
-            
+
         self.pto = HuginPTO(self.project_pto)
 
         ## create output video subdir tree
@@ -33,10 +32,6 @@ class Configuration:
 
         self.input_dir = Path(path.join(self.data_dir, '1__input_frames'))
         self.input_dir.mkdir(parents=True, exist_ok=True)
-        self.frames_input = Path(path.join(self.input_dir, 'original_frames'))
-        self.frames_input.mkdir(parents=True, exist_ok=True)
-        self.audio_dir = Path(path.join(self.input_dir, 'audio'))
-        self.audio_dir.mkdir(parents=True, exist_ok=True)
 
         ### Lens projections
         self.prjn_video_name = "input_projection.mkv"
