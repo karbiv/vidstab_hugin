@@ -113,6 +113,8 @@ class OutFrames:
             rcoords = check_output(['pano_trafo', self.rectilinear_pto.filepath, '0'],
                                    input=orig_coords).strip().split()
 
+        # filter out possible preceding WARNING message
+        rcoords = rcoords[-2:]
         x = float(rcoords[0])-(self.rectilinear_pto.canvas_w/2)
         y = (self.rectilinear_pto.canvas_h/2)-float(rcoords[1])
 

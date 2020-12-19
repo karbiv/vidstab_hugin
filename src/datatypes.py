@@ -102,9 +102,15 @@ class HuginPTO:
         self.half_vfov = math.degrees(math.atan(vert_max_tan))
     
     def unpack_crop(self, crop):
-        self.crop_l = int(crop[0])
-        self.crop_r = int(crop[1])
-        self.crop_t = int(crop[2])
-        self.crop_b = int(crop[3])
+        if crop:
+            self.crop_l = int(crop[0])
+            self.crop_r = int(crop[1])
+            self.crop_t = int(crop[2])
+            self.crop_b = int(crop[3])
+        else:
+            self.crop_l = 0
+            self.crop_r = self.canvas_w
+            self.crop_t = 0
+            self.crop_b = self.canvas_h
         self.crop_w = self.crop_r - self.crop_l
         self.crop_h = self.crop_b - self.crop_t

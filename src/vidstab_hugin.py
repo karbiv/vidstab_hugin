@@ -41,7 +41,7 @@ def conveyor():
 
     rectilinear_pto = utils.create_rectilinear_pto()
     out_frms = out_frames.OutFrames(cfg, rectilinear_pto)
-    
+
     ps = utils.print_step
     step = int(cmd_args.step)
     print()
@@ -82,4 +82,3 @@ def conveyor():
 
 if __name__ == '__main__':
     conveyor()
-

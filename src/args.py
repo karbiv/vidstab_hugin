@@ -43,7 +43,7 @@ class VideoFileAction(Action):
 
 
 max_cpus = 32
-max_smoothing = 200
+max_smoothing = 95
 num_cpus_default = 4
 default_smoothing_percent_of_fps = 83
 stepsize = 6
