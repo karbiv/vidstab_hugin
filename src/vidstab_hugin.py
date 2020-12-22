@@ -39,45 +39,45 @@ def conveyor():
     cfg.prev_args, unknown_args_prev = prev_parser.parse_known_args(args=args_list)
     open(cfg.cmd_args, 'w').write('\n'.join(sys.argv[1:])) # update prev args
 
-    rectilinear_pto = utils.create_rectilinear_pto()
-    out_frms = out_frames.OutFrames(cfg, rectilinear_pto)
+    out_frms = out_frames.OutFrames(cfg, utils.create_rectilinear_pto())
 
     ps = utils.print_step
     step = int(cmd_args.step)
     print()
 
+    frames_total = 0
+    
     if step in (1, 0):
         ps('STEP 1, input frames and split audio.')
         inpt_frames.store_input_frames()
+        frames_total = len(os.listdir(cfg.input_dir))
 
     if step in (2, 0):
-        ps('STEP 2, analyze cam motions in input video.')
+        ps('STEP 2, analyze cam motions in input video.', frames_total)
         vs.analyze()
 
     if step in (3, 0):
-        ps('STEP 3, camera rotations in Hugin.')
+        ps(f'STEP 3, camera rotations in Hugin.', frames_total)
         out_frms.compute_hugin_camera_rotations()
 
     ## step used only if Rolling Shutter correction is done
     if step in (4, 0):
         if utils.args_rolling_shutter(): # cfg.args.rs_xy and cfg.args.rs_roll options
-            ps('STEP 4, analyze cam motions in video with corrected Rolling Shutter.')
+            ps('STEP 4, analyze cam motions in video with corrected Rolling Shutter.',
+               frames_total)
             vs.analyze2()
             out_frms.compute_hugin_camera_rotations_processed()
         else:
-            ps('SKIP STEP 4, (analyze cam motions in video with corrected Rolling Shutter).')
+            ps('SKIP STEP 4, (analyze cam motions in video with corrected Rolling Shutter).',
+               frames_total)
 
     if step in (5, 0):
-        ps('STEP 5, create stabilized frames, Hugin')
+        ps(f'STEP 5, create stabilized frames, Hugin.', frames_total)
         out_frms.frames()
 
     if step in (6, 0):
-        ps('STEP 6, create video from stabilized frames, FFMPEG')
+        ps(f'STEP 6, create video from stabilized frames, FFMPEG.', frames_total)
         out_frms.video()
-
-    if step in (7, 0) and cfg.args.outfilter:
-        ps('STEP 7, FFMPEG filter for output video')
-        out_frms.ffmpeg_filter()
 
 
 if __name__ == '__main__':

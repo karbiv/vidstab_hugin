@@ -10,7 +10,9 @@ class Configuration:
     def __init__(self, args):
 
         self.args = args
-        self.project_pto = args.pto
+
+        self.project_pto = path.join(args.workdir, "result.pto")
+        args.pto = self.project_pto
 
         if not path.isfile(args.videofile):
             print('\nFilepath doesn\'t exist: {}\n'.format(args.videofile)); exit()
@@ -29,6 +31,8 @@ class Configuration:
         self.hugin_projects_processed = Path(path.join(self.workdir, 'hugin_ptos_processed'))
         self.hugin_projects_processed.mkdir(parents=True, exist_ok=True)
         self.projection_pto_path = path.join(self.workdir, 'vidstab_projection.pto')
+        #self.rectilinear_pto_path = path.join(self.workdir, 'rectilinear.pto')
+        self.rectilinear_pto_path = path.join(path.abspath(args.workdir), 'rectilinear.pto')
 
         self.input_dir = Path(path.join(self.data_dir, '1__input_frames'))
         self.input_dir.mkdir(parents=True, exist_ok=True)
@@ -49,7 +53,6 @@ class Configuration:
         self.rolling_shutter.mkdir(parents=True, exist_ok=True)
         self.frames_input_processed = Path(path.join(self.rolling_shutter, 'original_frames_processed'))
         self.frames_input_processed.mkdir(parents=True, exist_ok=True)
-        self.rectilinear_pto_path = path.join(self.rolling_shutter, 'rectilinear.pto')
 
         self.prjn_basedir2 = Path(path.join(self.data_dir, '4__lens_projection_frames_for_vidstab'))
         self.prjn_basedir2.mkdir(parents=True, exist_ok=True)
@@ -64,12 +67,13 @@ class Configuration:
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
 
         self.out_video_name = 'out_video.mkv'
+        self.out_video_prjn_name = 'out_video_prjn_vidstab.mkv'
+        
         self.out_video_dir = Path(path.join(self.data_dir, '6__output_video'))
         self.out_video_dir.mkdir(parents=True, exist_ok=True)
-        self.out_video = path.join(self.out_video_dir, self.out_video_name)
 
-        self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
-        self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
+        # self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
+        # self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
 
         ## saved command args file
         self.cmd_args = path.join(self.workdir, 'cmd_args.txt')

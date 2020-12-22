@@ -21,7 +21,7 @@ def create_pto_txt_one_image(pto_path):
             if line.startswith('i') and not first_img_found:
                 pto_txt += line
                 first_img_found = True
-            elif not line.startswith('i'):
+            elif not line.startswith(('i', 'v', 'c')):
                 pto_txt += line
     return pto_txt
 
@@ -64,14 +64,16 @@ def create_vidstab_projection_pto_file(pto_path):
 def create_rectilinear_pto():
     '''rectilinear pto to calculate camera rotations'''
     cfg = config.cfg
-    pto_path = cfg.rectilinear_pto_path
-    pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
-    ## change to rectilinear projection
-    pto_txt = re.sub(r'p f[^\n\t ]+', 'p f0 ', pto_txt)
-    with open(pto_path, 'w') as f:
-        f.write(pto_txt)
+    
+    # pto_path = cfg.rectilinear_pto_path
+    # pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
+    # ## change to rectilinear projection
+    # pto_txt = re.sub(r'p f[^\n\t ]+', 'p f0 ', pto_txt)
+    # with open(pto_path, 'w') as f:
+    #     f.write(pto_txt)
+    # return datatypes.HuginPTO(pto_path)
 
-    return datatypes.HuginPTO(pto_path)
+    return datatypes.HuginPTO(cfg.rectilinear_pto_path)
 
 
 def delete_files_in_dir(dir_path):
@@ -315,9 +317,11 @@ def to_upd_camera_rotations_processed(vidstab_dir):
     return False
 
 
-def print_step(msg):
+def print_step(msg, frames_total=None):
     print('_______')
     print(msg)
+    if frames_total:
+        print(f'{frames_total} frames total.')
     print()
 
 
@@ -342,5 +346,6 @@ def print_progress(iteration, total, prefix = '', suffix = '', decimals = 1,
 
     if not iteration == total:
         print('\r', end='')
+
     else:
         print('\n')

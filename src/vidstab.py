@@ -31,7 +31,7 @@ class Vidstab:
             input_video = cfg.args.videofile
             vidstab_dir = cfg.prjn_dir1_vidstab_orig
             frames_dir = cfg.input_dir
-
+            
         if not utils.to_upd_analyze(vidstab_dir, frames_dir):
             return
 

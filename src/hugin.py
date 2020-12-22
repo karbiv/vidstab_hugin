@@ -12,20 +12,30 @@ frame_crop_heights = None
 frames_crop_q: Queue = None
 
 
-def frames_output(task):
+def frames_output(task, all_out_frames, frames_stabilized_dir):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
+
+    # print(task)
+    # hugin_task(img='000001.jpg', pto_file='000001.jpg.pto')
 
     if utils.args_rolling_shutter():
         hugin_ptos_dir = cfg.hugin_projects_processed
     else:
         hugin_ptos_dir = cfg.hugin_projects
     
-    out_img = path.join(cfg.current_output_path, task.img)
+    #out_img = path.join(cfg.current_output_path, task.img)
+    out_img = path.join(frames_stabilized_dir, task.img)
     task_pto_path = path.join(hugin_ptos_dir, task.pto_file)
 
+    # create only missing out frames
+    if not all_out_frames and path.exists(out_img):
+        return
+
     run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
-         '-o', out_img, task_pto_path], stdout=DEVNULL)
+         '-o', out_img, task_pto_path],
+        stdout=DEVNULL
+        )
 
     if frames_crop_q:
         tmp_hugp = HuginPTO(task_pto_path)

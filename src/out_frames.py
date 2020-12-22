@@ -49,8 +49,8 @@ class OutFrames:
 
         imgs = sorted(os.listdir(cfg.input_dir))
         self.half_hfov = math.radians(self.rectilinear_pto.canv_half_hfov)
-        horizont_tan = math.tan(self.half_hfov)
-        self.tan_pix = horizont_tan/(self.rectilinear_pto.canvas_w/2)
+        max_horizont_tan = math.tan(self.half_hfov)
+        self.tan_pix = max_horizont_tan/(self.rectilinear_pto.canvas_w/2)
 
         transforms_rel = utils.get_global_motions(vidstab_dir)
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
@@ -60,9 +60,8 @@ class OutFrames:
         path_img = path.join(cfg.input_dir, imgs[0])
         sk_img = skio.imread(path_img)
         cx, cy = np.array(sk_img.shape)[:2][::-1] / 2
-        #self.optical_center = cx+cfg.pto.lens_d, cy+cfg.pto.lens_e
         self.optical_center = cx, cy
-        
+
         if cfg.args.vidstab_prjn != -1:
             self.projection_pto = datatypes.HuginPTO(cfg.projection_pto_path)
 
@@ -79,9 +78,8 @@ class OutFrames:
         self.prjn_frames_total = len(tasks)
         self.prjn_frames_cnt = 0
         with Pool(int(cfg.args.num_cpus)) as p:
-            print(f'Create Hugin pto files with camera moves, {self.prjn_frames_total} frames')
-            results = [p.apply_async(self.camera_rotations_worker,
-                                     args=(t,),
+            print(f'Create Hugin pto files with camera moves.')
+            results = [p.apply_async(self.camera_rotations_worker, args=(t,),
                                      callback=self.prjn_worker_callback)
                        for t in tasks]
             for r in results:
@@ -96,7 +94,7 @@ class OutFrames:
     def camera_rotations_worker(self, task):
         cfg = self.cfg
         t, img, t_rel = task[0], task[1], task[2]
-
+        
         if cfg.args.vidstab_prjn == -1:
             orig_coords = '{} {}'.format(cfg.pto.orig_w/2 + t.x + cfg.pto.lens_d,
                                          cfg.pto.orig_h/2 - t.y + cfg.pto.lens_e)
@@ -105,19 +103,20 @@ class OutFrames:
                                    input=orig_coords.encode()).strip().split()
         else:
             ## get original coords from projection
-            projection_coords = '{} {}'.format(self.projection_pto.canvas_w/2 + t.x,
-                                               self.projection_pto.canvas_h/2 - t.y)
+            projection_coords = '{} {}'.format(
+                self.projection_pto.canvas_w/2 + t.x,
+                self.projection_pto.canvas_h/2 - t.y)
             orig_coords = check_output(['pano_trafo', '-r', cfg.projection_pto_path, '0'],
                                        input=projection_coords.encode('utf-8'))
             ## get rectilinear coords from original
             rcoords = check_output(['pano_trafo', self.rectilinear_pto.filepath, '0'],
                                    input=orig_coords).strip().split()
-
         # filter out possible preceding WARNING message
         rcoords = rcoords[-2:]
+
         x = float(rcoords[0])-(self.rectilinear_pto.canvas_w/2)
         y = (self.rectilinear_pto.canvas_h/2)-float(rcoords[1])
-
+        
         roll = 0-math.degrees(t.roll)
         yaw_deg = math.degrees(math.atan(x*self.tan_pix))
         pitch_deg = 0-math.degrees(math.atan(y*self.tan_pix))
@@ -148,12 +147,12 @@ class OutFrames:
             ## 100, best quality for JPEG in skimage
             skio.imsave(dest_img, img_as_ubyte(modified_orig_frame), quality=100)
             #### Rolling Shutter end
-
+            
         ## set input image path for frame PTO
         curr_pto_txt = re.sub(r'n".+\.(png|jpg|jpeg|tif)"', 'n"{}"'.format(dest_img), self.pto_txt)
-        curr_pto_txt = re.sub(r' y0 ', ' y{} '.format(round(yaw_deg, 15)), curr_pto_txt)
-        curr_pto_txt = re.sub(r' p0 ', ' p{} '.format(round(pitch_deg, 15)), curr_pto_txt)
-        curr_pto_txt = re.sub(r' r0 ', ' r{} '.format(round(roll, 15)), curr_pto_txt)
+        curr_pto_txt = re.sub(r' y[^\n\t ]+ ', ' y{} '.format(round(yaw_deg, 15)), curr_pto_txt)
+        curr_pto_txt = re.sub(r' p[^\n\t ]+ ', ' p{} '.format(round(pitch_deg, 15)), curr_pto_txt)
+        curr_pto_txt = re.sub(r' r[^\n\t ]+ ', ' r{} '.format(round(roll, 15)), curr_pto_txt)
 
         ### Write PTO project file for this frame
         filepath = '{}.pto'.format(path.basename(dest_img))
@@ -233,8 +232,8 @@ class OutFrames:
         frames_dir = cfg.frames_input_processed
         imgs = sorted(os.listdir(frames_dir))
         self.half_hfov = math.radians(self.rectilinear_pto.canv_half_hfov)
-        horizont_tan = math.tan(self.half_hfov)
-        self.tan_pix = horizont_tan/(self.rectilinear_pto.canvas_w/2)
+        max_horizont_tan = math.tan(self.half_hfov)
+        self.tan_pix = max_horizont_tan/(self.rectilinear_pto.canvas_w/2)
 
         transforms_rel = utils.get_global_motions(vidstab_dir)
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
@@ -252,8 +251,7 @@ class OutFrames:
         self.prjn_frames_total = len(tasks)
         self.prjn_frames_cnt = 0
         with Pool(int(cfg.args.num_cpus)) as p:
-            print('Rolling shutter, create Hugin pto files with camera moves, '
-                  f'{self.prjn_frames_total} frames total.')
+            print('Rolling shutter, create Hugin pto files with camera moves.')
             results = [p.apply_async(self.camera_rotations_processed_worker,
                                      args=(t,),
                                      callback=self.prjn_worker_callback)
@@ -282,6 +280,8 @@ class OutFrames:
             rcoords = check_output(['pano_trafo', self.rectilinear_pto.filepath, '0'],
                                    input=orig_coords).strip().split()
 
+        # filter out possible preceding WARNING message
+        rcoords = rcoords[-2:]
         x = float(rcoords[0])-(self.rectilinear_pto.canvas_w/2)
         y = (self.rectilinear_pto.canvas_h/2)-float(rcoords[1])
 
@@ -292,9 +292,9 @@ class OutFrames:
 
         ## set input image path for frame PTO
         curr_pto_txt = re.sub(r'n".+\.(png|jpg|jpeg|tif)"', 'n"{}"'.format(dest_img), self.pto_txt)
-        curr_pto_txt = re.sub(r' y0 ', ' y{} '.format(round(yaw_deg, 15)), curr_pto_txt)
-        curr_pto_txt = re.sub(r' p0 ', ' p{} '.format(round(pitch_deg, 15)), curr_pto_txt)
-        curr_pto_txt = re.sub(r' r0 ', ' r{} '.format(round(roll, 15)), curr_pto_txt)
+        curr_pto_txt = re.sub(r' y[^\n\t ]+ ', ' y{} '.format(round(yaw_deg, 15)), curr_pto_txt)
+        curr_pto_txt = re.sub(r' p[^\n\t ]+ ', ' p{} '.format(round(pitch_deg, 15)), curr_pto_txt)
+        curr_pto_txt = re.sub(r' r[^\n\t ]+ ', ' r{} '.format(round(roll, 15)), curr_pto_txt)
 
         ### Write PTO project file for this frame
         filepath = '{}.pto'.format(path.basename(dest_img))
@@ -313,29 +313,34 @@ class OutFrames:
         ## check if update is needed
         pto_files = sorted(os.listdir(hugin_ptos_dir))
         stabilized_imgs = sorted(os.listdir(cfg.frames_stabilized))
-        if len(stabilized_imgs) \
-           and not cfg.args.force_upd:
+
+        ptos_len = len(pto_files)
+        out_frames_len = len(stabilized_imgs)
+        all_out_frames = True
+        if out_frames_len != ptos_len:
+            all_out_frames = False
+
+        if out_frames_len and not cfg.args.force_upd:
             path_img = path.join(cfg.frames_stabilized, stabilized_imgs[0])
             frame_mtime = os.path.getmtime(path_img)
             path_pto = path.join(hugin_ptos_dir, pto_files[0])
             pto_mtime = os.path.getmtime(path_pto)
-            if pto_mtime < frame_mtime:
+            if pto_mtime < frame_mtime and all_out_frames:
                 return
+            elif pto_mtime > frame_mtime:
+                # delete all out frames
+                utils.delete_files_in_dir(cfg.frames_stabilized)
 
-        pto_files = sorted(os.listdir(hugin_ptos_dir))
         tasks = []
         for i, pto in enumerate(pto_files):
             tasks.append(datatypes.hugin_task(str(i+1).zfill(6)+'.jpg', pto))
 
-        utils.delete_files_in_dir(cfg.frames_stabilized)
-        cfg.current_output_path = cfg.frames_stabilized
-        cfg.current_pto_path = cfg.pto.filepath
-
         self.prjn_frames_total = len(tasks)
         self.prjn_frames_cnt = 0
         with Pool(int(cfg.args.num_cpus)) as p:
-            print(f'Create stabilized frames for output video, {self.prjn_frames_total} frames total.')
-            results = [p.apply_async(hugin.frames_output, args=(t,),
+            print(f'Create stabilized frames for output video.')
+            results = [p.apply_async(hugin.frames_output,
+                                     args=(t, all_out_frames, cfg.frames_stabilized),
                                      callback=self.prjn_worker_callback)
                        for t in tasks]
             for r in results:
@@ -345,7 +350,12 @@ class OutFrames:
     def video(self):
         cfg = self.cfg
 
-        output = path.join(cfg.out_video_dir, cfg.out_video)
+        if cfg.args.vidstab_prjn > -1:
+            out_video_path = path.join(cfg.out_video_dir, cfg.out_video_prjn_name)
+        else:
+            out_video_path = path.join(cfg.out_video_dir, cfg.out_video_name)
+        
+        output = path.join(cfg.out_video_dir, out_video_path)
 
         ## check if update needed
         stabilized_imgs = sorted(os.listdir(cfg.frames_stabilized))
@@ -388,29 +398,3 @@ class OutFrames:
             print(' '.join(cmd))
         run(cmd)
         print()
-
-
-    def ffmpeg_filter(self):
-        cfg = self.cfg
-
-        parts = cfg.args.outfilter.split(':')
-        w_crop, h_crop, w_size = float(parts[0]), float(parts[1]), int(parts[2])
-
-        cropf = f'crop=iw*{w_crop}:ih*{h_crop}:(iw-(iw*{w_crop}))/2:(ih-(ih*{h_crop}))/2'
-        scalef = f'scale={w_size}:-1,crop=floor(iw/2)*2:floor(ih/2)*2'
-        pixel_format = f'yuv420p'
-        filts = f'{cropf},{scalef},format={pixel_format}'
-
-        crf = '16'
-        ivid = path.join(cfg.out_video_dir, cfg.out_video)
-
-        import re
-        out_name = re.sub(r'[/\\]', '_', cfg.args.videofile).strip('_')+'.mkv'
-        output = path.join(cfg.ffmpeg_filtered_dir, out_name)
-
-        cmd = ['ffmpeg', '-i', ivid, '-c:v', 'libx264', '-vf', filts, '-crf', crf,
-               '-c:a', 'copy', '-loglevel', 'error', '-stats', '-y', output]
-
-        print(out_name)
-
-        run(cmd)

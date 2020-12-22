@@ -30,7 +30,7 @@
 # ; 4: Bi-quartic
 # ; 5: Bi-quintic
 
-from os import path
+from os import path, cpu_count
 from argparse import ArgumentParser, Action, SUPPRESS
 
 class VideoFileAction(Action):
@@ -43,11 +43,18 @@ class VideoFileAction(Action):
 
 
 max_cpus = 32
-max_smoothing = 95
-num_cpus_default = 4
+max_smoothing = 150
 default_smoothing_percent_of_fps = 83
 stepsize = 6
 xy_dflt, roll_dflt = 0, 0
+
+if cpu_count() == 2:
+    num_cpus_default = 1
+elif cpu_count() == 4:
+    num_cpus_default = 3
+else:
+    num_cpus_default = cpu_count() - 2
+
 
 def init_cmd_args(parser):
     pos_group = parser.add_argument_group('positional arguments')
@@ -56,9 +63,6 @@ def init_cmd_args(parser):
                            metavar='input_video_file',
                            action=VideoFileAction,
                            help='A path to video file to stabilize;')
-
-    parser.add_argument('--pto', type=str, nargs='?', required=True,
-                        help='Path to a Hugin project file(*.pto);')
 
     parser.add_argument('--workdir', type=str, nargs='?', required=True,
                         help='Path to where video render work is done;')
@@ -107,7 +111,7 @@ def init_cmd_args(parser):
                           help='Interpolation in rolling shutter correction.')
 
     '''Hugin projection number'''
-    ## if set, create frames with other projection for a video to pass to vidstab
+    ## if set, create frames with other projection for a video to vidstab
     parser.add_argument('--vidstab-prjn', type=int, nargs='?', required=False,
                         default=-1,
                         choices=range(-1, 21),
