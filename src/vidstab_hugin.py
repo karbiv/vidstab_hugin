@@ -43,7 +43,7 @@ def conveyor():
 
     ps = utils.print_step
     step = int(cmd_args.step)
-    print()
+    print(cfg.args.videofile)
 
     frames_total = 0
     
@@ -65,6 +65,7 @@ def conveyor():
         if utils.args_rolling_shutter(): # cfg.args.rs_xy and cfg.args.rs_roll options
             ps('STEP 4, analyze cam motions in video with corrected Rolling Shutter.',
                frames_total)
+            vs.create_processed_vidstab_input(cfg.input_processed_video_path)
             vs.analyze2()
             out_frms.compute_hugin_camera_rotations_processed()
         else:

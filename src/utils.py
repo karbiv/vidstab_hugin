@@ -144,11 +144,12 @@ def convert_relative_transforms_to_absolute(transforms_rel):
 #     return motions_rel
 
 
-def get_global_motions(from_dir, filename='global_motions.trf'):
+def get_global_motions(f):
+#def get_global_motions(from_dir, filename='global_motions.trf'):
     cfg = config.cfg
 
     motions = []
-    f = open(path.join(from_dir, filename))
+    #f = open(path.join(from_dir, filename))
 
     lines = f.read().splitlines()
     for line in lines:
@@ -239,7 +240,7 @@ def rolling_shutter_args_changed():
 
     if cfg.args.rs_xy != cfg.prev_args.rs_xy \
        or cfg.args.rs_roll != cfg.prev_args.rs_roll \
-       or cfg.args.rs_scantop != cfg.prev_args.rs_scantop:
+       or cfg.args.rs_topdown != cfg.prev_args.rs_topdown:
         return True
 
     return False
@@ -267,7 +268,8 @@ def to_upd_camera_rotations(vidstab_dir):
 
     pto_files = sorted(os.listdir(cfg.hugin_projects))
     num_orig_frames = len(os.listdir(cfg.input_dir))
-    if not pto_files or len(pto_files) != num_orig_frames:
+    
+    if not pto_files or len(pto_files)+1 != num_orig_frames:
         return True
     
     pto_0 = path.join(cfg.hugin_projects, pto_files[0])

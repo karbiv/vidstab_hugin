@@ -42,6 +42,8 @@ def frames_output(task, all_out_frames, frames_stabilized_dir):
         frames_crop_q.put((tmp_hugp.crop_l, tmp_hugp.crop_r,
                            tmp_hugp.crop_t, tmp_hugp.crop_b), True)
 
+    return task
+
 
 def collect_frame_crop_data(crop_queue, base_pto):
     '''Crop doesn't require sorting, save directly to a file.'''

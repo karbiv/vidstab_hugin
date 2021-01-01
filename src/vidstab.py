@@ -31,7 +31,7 @@ class Vidstab:
             input_video = cfg.args.videofile
             vidstab_dir = cfg.prjn_dir1_vidstab_orig
             frames_dir = cfg.input_dir
-            
+
         if not utils.to_upd_analyze(vidstab_dir, frames_dir):
             return
 
@@ -75,7 +75,7 @@ class Vidstab:
             vidstab_dir = cfg.prjn_dir2_vidstab_prjn
             frames_dir = cfg.prjn_dir2_frames
         else:
-            input_video = cfg.args.videofile
+            input_video = cfg.input_processed_video_path
             vidstab_dir = cfg.prjn_dir2_vidstab_orig
             frames_dir = cfg.frames_input_processed
 
@@ -113,7 +113,7 @@ class Vidstab:
         trf = 'transforms.trf'
         out = path.join(vidstab_dir, 'stabilized.mkv')
 
-        crf = '18'
+        crf = '21'
         smoothing_percent = int(cfg.args.smoothing)
         smoothing = round((int(cfg.fps)/100)*smoothing_percent)
         sm = 'smoothing={0}:relative=1'.format(smoothing)
@@ -137,9 +137,9 @@ class Vidstab:
 
 
     def create_processed_vidstab_input(self, output):
-        print('\n {}'.format(sys._getframe().f_code.co_name))
+        print('\n{}'.format(sys._getframe().f_code.co_name))
 
-        crf = '14'
+        crf = '16'
         ivid = path.join(self.cfg.frames_input_processed, '%06d.jpg')
 
         cmd = ['ffmpeg', '-framerate', self.cfg.fps, '-i', ivid,

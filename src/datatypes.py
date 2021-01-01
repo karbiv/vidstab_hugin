@@ -31,8 +31,8 @@ class HuginPTO:
     crop_b = None # bottom
     crop_w, crop_h = None, None
     orig_w, orig_h = None, None
-    half_hfov, half_vfov = None, None
-    canv_half_hfov, canv_half_vfov = None, None
+    frame_half_hfov, frame_half_vfov = None, None
+    canv_half_hfov = None
     lens_d, lens_e = None, None
     interpolation = 0
 
@@ -84,7 +84,7 @@ class HuginPTO:
                         if p.startswith('h'):
                             self.orig_h = int(p[1:])
                         if p.startswith('v'):
-                            self.half_hfov = float(p[1:])/2
+                            self.frame_half_hfov = float(p[1:])/2
                         if p.startswith('d'):
                             self.lens_d = float(p[1:])
                         if p.startswith('e'):
@@ -93,10 +93,10 @@ class HuginPTO:
 
         self.unpack_crop(crop_list)
         f.close()
-        self.calculate_crop_vert_fov(self.half_hfov)
+        self.calculate_crop_vert_fov(self.frame_half_hfov)
 
-    def calculate_crop_vert_fov(self, half_hfov):
-        horizontal_max_tan = math.tan(math.radians(half_hfov))
+    def calculate_crop_vert_fov(self, frame_half_hfov):
+        horizontal_max_tan = math.tan(math.radians(frame_half_hfov))
         tan_pix = horizontal_max_tan/(self.crop_w/2)
         vert_max_tan = (self.crop_h/2)*tan_pix
         self.half_vfov = math.degrees(math.atan(vert_max_tan))

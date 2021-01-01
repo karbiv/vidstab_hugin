@@ -62,6 +62,7 @@ class Configuration:
         self.prjn_dir2_vidstab_orig.mkdir(parents=True, exist_ok=True)
         self.prjn_dir2_vidstab_prjn = Path(path.join(self.prjn_basedir2, 'vidstab_pass_prjn'))
         self.prjn_dir2_vidstab_prjn.mkdir(parents=True, exist_ok=True)
+        self.input_processed_video_path = path.join(self.prjn_basedir2, 'processed_input.mkv')
 
         self.frames_stabilized = Path(path.join(self.data_dir, '5__stabilized_frames'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
