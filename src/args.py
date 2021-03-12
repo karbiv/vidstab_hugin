@@ -43,7 +43,7 @@ class VideoFileAction(Action):
 
 
 max_cpus = 32
-max_smoothing = 150
+max_smoothing = 100
 default_smoothing_percent_of_fps = 71
 stepsize = 6
 xy_dflt, roll_dflt = 0, 0
@@ -99,9 +99,13 @@ def init_cmd_args(parser):
                           help='Scanning direction of lines in the CMOS image sensor: 0=bottom-up, 1=top-down.'
                           'Depends on how the camera was held when shooting.')
 
-    rs_group.add_argument('--rs-xy', type=float, nargs='?', required=False,
+    rs_group.add_argument('--rs-along', type=float, nargs='?', required=False,
                           default=xy_dflt,
-                          help='Rolling shutter correction coefficient for translation x and y.')
+                          help='Rolling shutter correction coefficient for translation along lines.')
+    rs_group.add_argument('--rs-across', type=float, nargs='?', required=False,
+                          default=xy_dflt,
+                          help='Rolling shutter correction coefficient for translation of lines(up or down).')
+    
     rs_group.add_argument('--rs-roll', type=float, nargs='?', required=False,
                           default=roll_dflt,
                           help='Rolling shutter correction coefficient for camera roll.')
@@ -121,15 +125,6 @@ def init_cmd_args(parser):
     parser.add_argument('--force-upd', required=False,
                         action='store_true',
                         help='Flush cached files.')
-
-    parser.add_argument('--outfilter', type=str, nargs='?', required=False,
-                        default='',
-                        metavar="'w_crop_coeff:h_crop_coeff:width_pixels'",
-                        help="""FFMPEG crop/scale filtering of a rendered video.
-String of 3 numbers separated by colon(':').
-'width_crop_coeff:height_crop_coeff:width_pixels'
-Crop multipliers are equal or less than 1.0, width and height are multiplied by coeffs to define inner rectangle to crop.
-'width_pixels' defines pixel width an out video is scaled to.""")
 
     ## dev arguments
     parser.add_argument('--step', required=False, type=int, help=SUPPRESS, default=0)

@@ -41,6 +41,7 @@ class Vidstab:
         filts = detect.format(step, mincontrast, trf)
 
         show_detect = path.join(vidstab_dir, 'show.mkv')
+        #skip_first = "select='gte(n,0)',"
         cmd = ['ffmpeg', '-i', input_video, '-c:v', 'libx264', '-crf', '18',
                '-vf', filts,
                '-an', '-y',
@@ -55,7 +56,8 @@ class Vidstab:
         print()
 
         ## saves global_motions.trf
-        self.save_global_motions_trf_file(input_video, vidstab_dir)
+        ## was needed before gradient descent impl in py from C
+        #self.save_global_motions_trf_file(input_video, vidstab_dir)
 
 
     def analyze2(self):
@@ -82,6 +84,9 @@ class Vidstab:
         if not utils.to_upd_analyze(vidstab_dir, frames_dir):
             return
 
+        if utils.args_rolling_shutter():
+            self.create_processed_vidstab_input(cfg.input_processed_video_path)
+
         step = 'stepsize='+str(cfg.args.vs_stepsize)
         mincontrast = float(cfg.args.vs_mincontrast)
         detect = 'vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=1'
@@ -105,9 +110,11 @@ class Vidstab:
         print()
 
         ## saves global_motions.trf
-        self.save_global_motions_trf_file(input_video, vidstab_dir)
+        ## was needed before gradient descent impl in py from C
+        #self.save_global_motions_trf_file(input_video, vidstab_dir)
 
 
+    ## was needed before gradient descent impl in py from C
     def save_global_motions_trf_file(self, input_video, vidstab_dir):
         cfg = self.cfg
         trf = 'transforms.trf'
@@ -122,7 +129,7 @@ class Vidstab:
             format(trf, sm, maxangle)
 
         cmd = ['ffmpeg', '-i', input_video, '-vf', f, '-c:v', 'libx264', '-crf', crf,
-               '-t', '00:00:00.150',
+               '-t', '00:00:00.250',
                '-an', '-y',
                '-loglevel', 'error',
                '-stats',
@@ -132,12 +139,13 @@ class Vidstab:
         if cfg.args.verbose:
             print(' '.join(cmd))
         run(cmd, cwd=vidstab_dir,
-            check=True,
-            capture_output=True)
+            #check=True,
+            #capture_output=True
+            )
 
 
     def create_processed_vidstab_input(self, output):
-        print('\n{}'.format(sys._getframe().f_code.co_name))
+        print("Create corrected 'rolling shutter' video for vidstab")
 
         crf = '16'
         ivid = path.join(self.cfg.frames_input_processed, '%06d.jpg')

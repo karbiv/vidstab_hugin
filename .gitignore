@@ -2,6 +2,7 @@
 # to keep empty data dirs
 !**.gitignore
 
+env
 .venv
 
 __pycache__

@@ -39,15 +39,26 @@ class InFrames():
         inp = cfg.args.videofile
 
         cmd = ['ffmpeg',
-                '-loglevel', 'error',
-                '-stats',
-                '-i', inp,
-                '-qscale:v', '1',
-                path.join(cfg.input_dir, '%06d.jpg'), '-y'
-        ]
+               '-loglevel', 'error',
+               '-stats',
+               '-i', inp,
+               "-src_range", "1", # src is full range, 0-255
+               "-vsync", "drop", ## important to avoid 1st and 2 frames duplicated
+               '-q:v', '1',
+               path.join(cfg.input_dir, '%6d.jpg'), '-y'
+               ]
+
 
         print(f'Store frames of {cfg.args.videofile}')
         run(cmd, check=True)
+
+        ## remove first frame, can be a duplicate with the second in some cases
+        # imgs = sorted(os.listdir(frames_dir))
+        # try:
+        #     file_path = path.join(frames_dir, imgs[0])
+        #     os.unlink(file_path)
+        # except Exception as e:
+        #     raise("couldn't delete first frame")
 
 
     def create_projection_frames(self, frames_src_dir, frames_dst_dir, hugin_ptos_dir):
@@ -57,6 +68,7 @@ class InFrames():
             return
 
         utils.create_vidstab_projection_pto_file(cfg.projection_pto_path)
+        ## prjn_pto_txt used in other functions
         self.prjn_pto_txt = utils.create_pto_txt_one_image(cfg.projection_pto_path)
 
         imgs = sorted(os.listdir(frames_src_dir))
@@ -114,7 +126,7 @@ class InFrames():
     def create_input_video_for_vidstab(self, inp_frames_dir, vidstab_dir):
         cfg = self.cfg
 
-        crf = '16'
+        crf = '14'
         ## projection frames are for libvidstab, in JPEG
         ivid = path.join(inp_frames_dir, '%06d.jpg')
         output_file = path.join(vidstab_dir, cfg.prjn_video_name)

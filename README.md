@@ -1,5 +1,3 @@
-TODO image warp with LIBVIPS, or not..
-
 
 Command line tool to stabilize shaky videos using libvidstab(shared library filter in FFMPEG) and Hugin Panorama Stitcher(Panotools).
 

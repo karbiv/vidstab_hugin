@@ -15,6 +15,7 @@ import hugin
 import datatypes
 import utils
 
+import datetime as dt
 
 class OutFrames:
 
@@ -44,20 +45,23 @@ class OutFrames:
         if not utils.to_upd_camera_rotations(vidstab_dir):
             return
 
-        if utils.args_rolling_shutter():
-            print('Create input frames with corrected Rolling Shutter.')
-
         imgs = sorted(os.listdir(cfg.input_dir))
         self.canv_half_hfov = math.radians(self.rectilinear_pto.canv_half_hfov)
 
         max_horizont_tan = math.tan(self.canv_half_hfov)
         self.tan_pix = max_horizont_tan/(self.rectilinear_pto.canvas_w/2)
 
-        f_motions = open(path.join(vidstab_dir, 'global_motions.trf'))
-        transforms_rel = utils.get_global_motions(f_motions)
+        ###
+        # f_motions = open(path.join(vidstab_dir, 'global_motions.trf'))
+        # transforms_rel = utils.get_global_motions(f_motions)
+
+        transforms_rel = utils.parseTransformsTrf(path.join(vidstab_dir, 'transforms.trf'))
+        ###
+        
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
         transforms_abs_filtered = utils.gauss_filter(cfg.fps, transforms_abs,
                                                      cfg.args.smoothing)
+
         ## set center coords to lens' optical axis
         path_img = path.join(cfg.input_dir, imgs[0])
         sk_img = skio.imread(path_img)
@@ -70,31 +74,36 @@ class OutFrames:
         tasks = []
         for i, t in enumerate(zip(transforms_abs_filtered, transforms_rel)):
             path_img = path.join(cfg.input_dir, imgs[i])
-            tasks.append((t[0], path_img, t[1]))
+            tasks.append((t[0], path_img, t[1], i))
 
         self.pto_txt = utils.create_pto_txt_one_image(cfg.pto.filepath)
 
-        utils.delete_files_in_dir(cfg.hugin_projects)
+        if not utils.args_rolling_shutter():
+            utils.delete_files_in_dir(cfg.hugin_projects)
         utils.delete_files_in_dir(cfg.frames_input_processed)
 
+        if utils.args_rolling_shutter():
+            print('Create images with corrected Rolling Shutter.')
+        
         self.prjn_frames_total = len(tasks)
         self.prjn_frames_cnt = 0
         with Pool(int(cfg.args.num_cpus)) as p:
             if not utils.args_rolling_shutter():
                 print(f'Create Hugin pto files with camera moves.')
-            results = [p.apply_async(self.camera_rotations_worker, args=(t,),
-                                     callback=self.prjn_worker_callback)
+            results = [p.apply_async(self.camera_moves_worker, args=(t,),
+                                     callback=self.prjn_worker_callback
+                                     )
                        for t in tasks]
             for r in results:
                 r.get()
 
 
     def prjn_worker_callback(self, task):
+        utils.print_progress(self.prjn_frames_cnt, self.prjn_frames_total)
         self.prjn_frames_cnt += 1
-        utils.print_progress(self.prjn_frames_cnt, self.prjn_frames_total, length=80)
 
 
-    def camera_rotations_worker(self, task):
+    def camera_moves_worker(self, task):
         cfg = self.cfg
         t, img, t_rel = task[0], task[1], task[2]
 
@@ -123,6 +132,7 @@ class OutFrames:
         y = (self.rectilinear_pto.canvas_h/2)-float(rcoords[1])
 
         roll = 0-math.degrees(t.roll)
+        #roll = math.degrees(t.roll)
         yaw_deg = math.degrees(math.atan(x*self.tan_pix))
         pitch_deg = 0-math.degrees(math.atan(y*self.tan_pix))
 
@@ -142,7 +152,8 @@ class OutFrames:
 
             tx, ty = orig_coords.strip().split()
             orig_tx, orig_ty = float(tx) - cfg.pto.orig_w/2, cfg.pto.orig_h/2 - float(ty)
-            warp_args = {'roll': t_rel.roll, 'y_move': orig_ty, 'along_move': orig_tx}
+            warp_args = {'roll': t_rel.roll, 'y_move': orig_ty, 'along_move': orig_tx,
+                         'frame': task[3]}
             interpolation = int(cfg.args.rs_interpolation)
             modified_orig_frame = sktf.warp(sk_img,
                                             self.rolling_shutter_mappings,
@@ -152,6 +163,8 @@ class OutFrames:
             dest_img = path.join(cfg.frames_input_processed, path.basename(img))
             ## 100, best quality for JPEG in skimage
             skio.imsave(dest_img, img_as_ubyte(modified_orig_frame), quality=100)
+            ## PNG
+            #skio.imsave(dest_img, img_as_ubyte(modified_orig_frame))
             #### Rolling Shutter end
 
         else: # not utils.args_rolling_shutter()
@@ -169,8 +182,15 @@ class OutFrames:
 
     def rolling_shutter_mappings(self, xy, **kwargs):
         '''Inverse map function'''
+
+        #print(xy.shape)
+        # xy shape (2073600, 2)
+
         cfg = self.cfg
         num_lines = cfg.pto.orig_h
+        y_move = kwargs['y_move']
+        along_move = kwargs['along_move']
+        roll = kwargs['roll']
 
         if cfg.args.rs_topdown:
             line_idxs = tuple(range(num_lines))
@@ -178,41 +198,67 @@ class OutFrames:
             line_idxs = tuple(reversed(range(num_lines)))
 
         #### ACROSS and ALONG lines
-        if float(cfg.args.rs_xy) > 0:
-            last_line_across = kwargs['y_move'] * float(cfg.args.rs_xy)
-            across_delta = last_line_across / num_lines
-            across_line_shift = 0
+        if float(cfg.args.rs_across) > 0.0 \
+           or float(cfg.args.rs_along) > 0.0 \
+           or float(cfg.args.rs_roll):
 
-            last_line_along = kwargs['along_move'] * float(cfg.args.rs_xy)
-            along_delta = last_line_along / num_lines
-            along_line_shift = 0
+            max_shift_across = y_move * float(cfg.args.rs_across)
+            if abs(y_move) > 1.0:
+                across_delta = max_shift_across / num_lines
+                across_line_shift = 0
 
-            # TODO optimize, vectorize
-            for i in line_idxs: # bottom-up
                 ## across
-                y = xy[i::num_lines, 1]
-                xy[i::num_lines, 1] = y + across_line_shift
-                across_line_shift += across_delta
+                for i in line_idxs:
+                    y = xy[i::num_lines, 1]
+                    xy[i::num_lines, 1] = y + across_line_shift
+                    across_line_shift += across_delta
+
+                # xy2 = np.copy(xy)
+                # s = dt.datetime.now()
+                # deltas = np.arange(0, across_delta*num_lines, across_delta)
+                # deltas = np.dstack((np.zeros_like(deltas), deltas))
+                # xy2.shape = (1920, 1080, 2)
+                # xy2 = np.add(xy2, deltas)
+                # e = dt.datetime.now() - s
+                # print(e.total_seconds())
+
+            if abs(along_move) > 1.0:
+                last_line_along = along_move * float(cfg.args.rs_along)
+                ## compensate number of lines after across lines correction
+                along_delta = last_line_along / (num_lines + round(max_shift_across))
+                along_line_shift = 0
 
                 ## along
-                x = xy[i::num_lines, 0]
-                xy[i::num_lines, 0] = x + along_line_shift
-                along_line_shift += along_delta
+                for i in line_idxs:
+                    x = xy[i::num_lines, 0]
+                    xy[i::num_lines, 0] = x + along_line_shift
+                    along_line_shift += along_delta
 
         #### ROLL lines
-        if float(cfg.args.rs_roll) > 0:
+        if float(cfg.args.rs_roll) > 0 \
+           and abs(roll) > 0.0003:
 
-            ## Roll is in degrees
+            max_shift_across = y_move * float(cfg.args.rs_across)
+            across_delta = max_shift_across / num_lines
+            across_line_shift = 0
+
+            last_line_along = along_move * float(cfg.args.rs_along)
+            along_delta = last_line_along / (num_lines + round(max_shift_across))
+            along_line_shift = 0
+
             roll_coeff = float(cfg.args.rs_roll)
-            last_line_roll = kwargs['roll'] * roll_coeff
+            last_line_roll = roll * roll_coeff
             roll_delta = last_line_roll / num_lines
+            #roll_delta = last_line_roll / (num_lines + round(max_shift_across))
 
             x0, y0 = self.optical_center
+
             x, y = xy.T
             cx, cy = x-x0, y-y0
 
-            theta = 0
             cxy = np.column_stack((cx, cy))
+
+            theta = 0
 
             for i in line_idxs:
                 x, y = cxy[i::num_lines].T
@@ -243,8 +289,13 @@ class OutFrames:
         max_horizont_tan = math.tan(self.canv_half_hfov)
         self.tan_pix = max_horizont_tan/(self.rectilinear_pto.canvas_w/2)
 
-        f_motions = open(path.join(vidstab_dir, 'global_motions.trf'))
-        transforms_rel = utils.get_global_motions(f_motions)
+        ##
+        # f_motions = open(path.join(vidstab_dir, 'global_motions.trf'))
+        # transforms_rel = utils.get_global_motions(f_motions)
+
+        transforms_rel = utils.parseTransformsTrf(path.join(vidstab_dir, 'transforms.trf'))
+        ##
+        
         transforms_abs = utils.convert_relative_transforms_to_absolute(transforms_rel)
         transforms_abs_filtered = utils.gauss_filter(cfg.fps, transforms_abs, cfg.args.smoothing)
 
@@ -347,15 +398,6 @@ class OutFrames:
         self.prjn_frames_cnt = 0
         with Pool(int(cfg.args.num_cpus)) as p:
             print(f'Create stabilized frames for output video.')
-            # pairs = []
-            # for t in tasks:
-            #     pairs.append((p.apply_async(hugin.frames_output,
-            #                                 args=(t, all_out_frames, cfg.frames_stabilized),
-            #                                 callback=self.prjn_worker_callback),
-            #                   t))
-            # for p in pairs:
-            #     print()
-
             results = [p.apply_async(hugin.frames_output,
                                      args=(t, all_out_frames, cfg.frames_stabilized),
                                      callback=self.prjn_worker_callback)
@@ -384,7 +426,7 @@ class OutFrames:
             if (output_video_mtime > frame_mtime):
                 return
 
-        crf = '16'
+        crf = '14'
         ivid = path.join(cfg.frames_stabilized, '%06d.jpg')
 
         audio_filepath = path.join(cfg.out_video_dir, 'sound.ogg')

@@ -6,6 +6,7 @@ from multiprocessing import Queue
 import config
 import utils
 from datatypes import HuginPTO
+#import datetime as dt
 
 frame_crop_widths = None
 frame_crop_heights = None
@@ -32,10 +33,15 @@ def frames_output(task, all_out_frames, frames_stabilized_dir):
     if not all_out_frames and path.exists(out_img):
         return
 
+    #s = dt.datetime.now()
+
     run(['nona', '-g', '-i', '0', '-r', 'ldr', '-m', 'JPEG', '-z', '100',
          '-o', out_img, task_pto_path],
         stdout=DEVNULL
         )
+
+    # e = dt.datetime.now() - s
+    # print(e.total_seconds())
 
     if frames_crop_q:
         tmp_hugp = HuginPTO(task_pto_path)

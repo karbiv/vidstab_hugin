@@ -69,12 +69,7 @@ class Configuration:
 
         self.out_video_name = 'out_video.mkv'
         self.out_video_prjn_name = 'out_video_prjn_vidstab.mkv'
-        
-        self.out_video_dir = Path(path.join(self.data_dir, '6__output_video'))
-        self.out_video_dir.mkdir(parents=True, exist_ok=True)
-
-        # self.ffmpeg_filtered_dir = Path(path.join(self.data_dir, '7__ffmpeg_filtered_video'))
-        # self.ffmpeg_filtered_dir.mkdir(parents=True, exist_ok=True)
+        self.out_video_dir = self.data_dir
 
         ## saved command args file
         self.cmd_args = path.join(self.workdir, 'cmd_args.txt')

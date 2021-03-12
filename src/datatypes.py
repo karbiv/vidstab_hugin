@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from collections.abc import Mapping
 import math
 
 
@@ -8,7 +7,6 @@ class transform:
     x: float
     y: float
     roll: float
-
 
 @dataclass
 class hugin_task:
