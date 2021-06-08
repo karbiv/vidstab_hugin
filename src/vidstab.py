@@ -2,6 +2,7 @@ import os
 from os import path
 import sys
 from subprocess import run, DEVNULL
+import datetime as dt
 import utils
 import inp_frames
 import out_frames
@@ -18,22 +19,8 @@ class Vidstab:
         trf = 'transforms.trf'
         cfg = self.cfg
 
-        if cfg.args.vidstab_prjn > -1:
-            inpt_frames = inp_frames.InFrames(cfg)
-            inpt_frames.create_projection_frames(cfg.input_dir,
-                                                 cfg.prjn_dir1_frames,
-                                                 cfg.hugin_projects)
-            input_video = inpt_frames.create_input_video_for_vidstab(cfg.prjn_dir1_frames,
-                                                                     cfg.prjn_dir1_vidstab_prjn)
-            vidstab_dir = cfg.prjn_dir1_vidstab_prjn
-            frames_dir = cfg.prjn_dir1_frames
-        else:
-            input_video = cfg.args.videofile
-            vidstab_dir = cfg.prjn_dir1_vidstab_orig
-            frames_dir = cfg.input_dir
-
-        if not utils.to_upd_analyze(vidstab_dir, frames_dir):
-            return
+        input_video = cfg.convey.curr_input_video
+        vidstab_dir = cfg.convey.curr_vidstab_dir
 
         step = 'stepsize='+str(cfg.args.vs_stepsize)
         mincontrast = float(cfg.args.vs_mincontrast)
@@ -52,37 +39,20 @@ class Vidstab:
         print('Analyze cam motions in video (libvidstab)')
         if cfg.args.verbose:
             print(' '.join(cmd))
+
+        s = dt.datetime.now()
         run(cmd, cwd=vidstab_dir)
-        print()
+        e = dt.datetime.now() - s
+        utils.print_time(e.total_seconds())
 
         ## saves global_motions.trf
         ## was needed before gradient descent impl in py from C
-        #self.save_global_motions_trf_file(input_video, vidstab_dir)
+        self.save_global_motions_trf_file(input_video, vidstab_dir)
 
 
     def analyze2(self):
         trf = 'transforms.trf'
         cfg = self.cfg
-
-        if not utils.args_rolling_shutter():
-            return
-
-        if cfg.args.vidstab_prjn > -1:
-            inpt_frames = inp_frames.InFrames(cfg)
-            inpt_frames.create_projection_frames(cfg.frames_input_processed,
-                                                 cfg.prjn_dir2_frames,
-                                                 cfg.hugin_projects_processed)
-            input_video = inpt_frames.create_input_video_for_vidstab(cfg.prjn_dir2_frames,
-                                                                     cfg.prjn_dir2_vidstab_prjn)
-            vidstab_dir = cfg.prjn_dir2_vidstab_prjn
-            frames_dir = cfg.prjn_dir2_frames
-        else:
-            input_video = cfg.input_processed_video_path
-            vidstab_dir = cfg.prjn_dir2_vidstab_orig
-            frames_dir = cfg.frames_input_processed
-
-        if not utils.to_upd_analyze(vidstab_dir, frames_dir):
-            return
 
         if utils.args_rolling_shutter():
             self.create_processed_vidstab_input(cfg.input_processed_video_path)
@@ -92,6 +62,9 @@ class Vidstab:
         detect = 'vidstabdetect=shakiness=10:accuracy=15:{0}:mincontrast={1}:result={2}:show=1'
         filts = detect.format(step, mincontrast, trf)
 
+        input_video = cfg.convey.curr_input_video
+        vidstab_dir = cfg.convey.curr_vidstab_dir
+
         show_detect = path.join(vidstab_dir, 'show.mkv')
         cmd = ['ffmpeg', '-i', input_video, '-c:v', 'libx264', '-crf', '18',
                '-vf', filts,
@@ -100,6 +73,7 @@ class Vidstab:
                '-stats',
                show_detect]
 
+        s = dt.datetime.now()
         print('Vidstab analyze video after rolling shutter correction')
         if cfg.args.verbose:
             print(' '.join(cmd))
@@ -107,7 +81,8 @@ class Vidstab:
             run(cmd, cwd=vidstab_dir)
         else:
             run(cmd, cwd=vidstab_dir, stdout=DEVNULL)
-        print()
+        e = dt.datetime.now() - s
+        utils.print_time(e.total_seconds())
 
         ## saves global_motions.trf
         ## was needed before gradient descent impl in py from C
@@ -155,4 +130,7 @@ class Vidstab:
                #'-vf', cropf,
                '-loglevel', 'error', '-stats', '-an', '-y', output]
 
+        s = dt.datetime.now()
         run(cmd)
+        e = dt.datetime.now() - s
+        utils.print_time(e.total_seconds())

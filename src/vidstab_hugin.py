@@ -6,12 +6,13 @@ import sys
 import signal
 from argparse import ArgumentParser
 import config
-import inp_frames
-import vidstab
 import out_frames
 import utils
 import args
 import datetime as dt
+from inp_frames import InFrames
+from vidstab import Vidstab
+from conveyor import Conveyor, Step
 
 
 def signal_handler(signalnum, frame):
@@ -22,12 +23,14 @@ parser = ArgumentParser(description="Stabilizes videos using libvidstab(FFMPEG) 
 args.init_cmd_args(parser)
 
 
-def conveyor():
+def main():
     cmd_args, unknown_args = parser.parse_known_args()
     cfg = config.cfg = config.Configuration(cmd_args)
 
-    inpt_frames = inp_frames.InFrames(cfg)
-    vs = vidstab.Vidstab(cfg)
+    inframes = cfg.inframes = InFrames(cfg)
+    vs = cfg.vidstab = Vidstab(cfg)
+    convey = cfg.convey = Conveyor(cfg)
+    out_frms = cfg.out_frms = out_frames.OutFrames(cfg)
 
     ## Cached previous command arguments
     if not path.exists(cfg.cmd_args):
@@ -40,64 +43,53 @@ def conveyor():
     cfg.prev_args, unknown_args_prev = prev_parser.parse_known_args(args=args_list)
     open(cfg.cmd_args, 'w').write('\n'.join(sys.argv[1:])) # update prev args
 
-    out_frms = out_frames.OutFrames(cfg, utils.create_rectilinear_pto())
-
-    ps = utils.print_step
-    step = int(cmd_args.step)
-    print(cfg.args.videofile)
-
-    frames_total = 0
+    add_step = convey.add_step
     
-    if step in (1, 0):
-        ps('STEP 1, input frames and split audio.')
-        s = dt.datetime.now()
-        inpt_frames.store_input_frames()
-        e = dt.datetime.now() - s
-        #print("Time elapsed: ", e.total_seconds())
-        frames_total = len(os.listdir(cfg.input_dir))
+    step_arg = int(cmd_args.step)
+    print('Videofile:  ', cfg.args.videofile)
+    print('Workdir:    ', cfg.args.workdir)
+    print('PTO(Hugin): ', cfg.args.pto_name)
 
-    if step in (2, 0):
-        ps('STEP 2, analyze cam motions in input video.', frames_total)
-        s = dt.datetime.now()
-        vs.analyze()
-        e = dt.datetime.now() - s
-        #print("Time elapsed: ", e.total_seconds())
 
-    if step in (3, 0):
-        ps(f'STEP 3, camera rotations in Hugin.', frames_total)
-        s = dt.datetime.now()
-        out_frms.compute_hugin_camera_rotations()
-        e = dt.datetime.now() - s
-        #print("Time elapsed: ", e.total_seconds())
+    add_step(
+        'STEP_1: input frames and split audio.',
+        convey.to_upd_input_frames,
+        inframes.store_input_frames)
 
-    ## step used only if Rolling Shutter correction is done
-    if step in (4, 0):
-        s = dt.datetime.now()
-        if utils.args_rolling_shutter(): # cfg.args.rs_xy and cfg.args.rs_roll options
-            ps('STEP 4, analyze cam motions in video with corrected Rolling Shutter.',
-               frames_total)
-            vs.analyze2()
-            out_frms.compute_hugin_camera_rotations_processed()
-        else:
-            ps('SKIP STEP 4, (analyze cam motions in video with corrected Rolling Shutter).',
-               frames_total)
-        e = dt.datetime.now() - s
-        #print("Time elapsed: ", e.total_seconds())
+    add_step(
+        'STEP_2: analyze cam motions in input video.',
+        convey.to_upd_analyze,
+        vs.analyze)
+    
+    add_step(
+        'STEP_3: camera rotations in Hugin.',
+        convey.to_upd_camera_rotations,
+        out_frms.compute_hugin_camera_rotations)
+    
+    add_step(
+        'STEP_4: analyze cam moves with corrected Rolling Shutter.',
+        convey.to_upd_rs_analyze,
+        convey.rs_analyze)
+    
+    add_step(
+        'STEP_5: create stabilized frames, Hugin.',
+        convey.to_upd_out_frames,
+        out_frms.frames)
 
-    if step in (5, 0):
-        ps(f'STEP 5, create stabilized frames, Hugin.', frames_total)
-        s = dt.datetime.now()
-        out_frms.frames()
-        e = dt.datetime.now() - s
-        print("Time elapsed: ", e.total_seconds())
+    add_step(
+        'STEP_6: create video from stabilized frames.',
+        convey.to_upd_out_video,
+        out_frms.video)
+    
+    s = dt.datetime.now()
 
-    if step in (6, 0):
-        ps(f'STEP 6, create video from stabilized frames, FFMPEG.', frames_total)
-        s = dt.datetime.now()
-        out_frms.video()
-        e = dt.datetime.now() - s
-        #print("Time elapsed: ", e.total_seconds())
+    convey.execute(step_arg)
+
+    e = dt.datetime.now() - s
+    print()
+    print()
+    utils.print_time(e.total_seconds(), prefix='Total time')
 
 
 if __name__ == '__main__':
-    conveyor()
+    main()

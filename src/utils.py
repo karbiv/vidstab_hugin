@@ -13,6 +13,28 @@ import random
 from dataclasses import dataclass
 import typing
 import statistics as stats
+from array import array
+
+
+def print_time(secs, fps=False, prefix=None):
+    cfg = config.cfg
+    round_secs = round(secs, 3)
+
+    if round_secs < 60:
+        time = f"{round_secs}"
+    else:
+        mins = int(round_secs // 60)
+        subsecs = round(round_secs % 60, 3)
+        time = f"{mins}:{subsecs}"
+
+    if not prefix:
+        prefix = 'time:'
+
+    if fps:
+        fps = round(cfg.frames_total / (secs + 0.0001), 1)
+        print(f"{prefix} {time};  fps {fps};")
+    else:
+        print(f"{prefix} {time};")
 
 
 def create_pto_txt_one_image(pto_path):
@@ -60,9 +82,9 @@ def create_vidstab_projection_pto_file(pto_path):
     pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
     with open(pto_path, 'w') as f:
         f.write(pto_txt)
-    projection = cfg.args.vidstab_prjn
-    run(['pano_modify', '-o', pto_path,
-         #'--canvas={}x{}'.format(cfg.pto.canvas_w*3, cfg.pto.canvas_h*3),
+        projection = cfg.args.vidstab_prjn
+        run(['pano_modify', '-o', pto_path,
+             #'--canvas={}x{}'.format(cfg.pto.canvas_w*3, cfg.pto.canvas_h*3),
          '--crop=AUTO', pto_path, '--projection='+str(projection) ], stdout=DEVNULL)
 
 
@@ -70,15 +92,23 @@ def create_rectilinear_pto():
     '''rectilinear pto to calculate camera rotations'''
     cfg = config.cfg
 
-    # pto_path = cfg.rectilinear_pto_path
-    # pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
-    # ## change to rectilinear projection
-    # pto_txt = re.sub(r'p f[^\n\t ]+', 'p f0 ', pto_txt)
-    # with open(pto_path, 'w') as f:
-    #     f.write(pto_txt)
-    # return datatypes.HuginPTO(pto_path)
+    pto_path = cfg.rectilinear_pto_path
+    pto_txt = create_pto_txt_one_image(cfg.pto.filepath)
 
-    return datatypes.HuginPTO(cfg.rectilinear_pto_path)
+    ## change to rectilinear projection
+    pto_txt = re.sub(r'p f[^\n\t ]+', 'p f0', pto_txt)
+
+    ## set horizontal view angle, otherwise rectilinear canvas too small
+    horiz_canvas = int(round(cfg.pto.frame_half_hfov))*2
+    hmargins = (horiz_canvas/100)*17
+    pto_txt = re.sub(r' v[^\n\t ]+', r' v'+str(horiz_canvas+hmargins),
+                     pto_txt, count=1)
+
+    with open(pto_path, 'w') as f:
+        f.write(pto_txt)
+
+    return datatypes.HuginPTO(pto_path)
+#return datatypes.HuginPTO(cfg.rectilinear_pto_path)
 
 
 def delete_files_in_dir(dir_path):
@@ -96,31 +126,31 @@ def delete_filepath(file_path):
 
 
 def gauss_filter(fps, transforms_abs, smooth_percent):
-        smoothing = round((int(fps)/100)*int(smooth_percent))
-        mu = smoothing
-        s = mu*2+1
+    smoothing = round((int(fps)/100)*int(smooth_percent))
+    mu = smoothing
+    s = mu*2+1
 
-        sigma2 = (mu/2)**2
+    sigma2 = (mu/2)**2
 
-        kernel = np.exp(-(np.arange(s)-mu)**2/sigma2)
+    kernel = np.exp(-(np.arange(s)-mu)**2/sigma2)
 
-        transforms_filtered = [0]*len(transforms_abs)
-        tlen = len(transforms_abs)
-        for i in range(tlen):
-            ## make a convolution:
-            weightsum, avg = 0.0, datatypes.transform(0, 0, 0)
-            for k in range(s):
-                idx = i+k-mu
-                if idx >= 0 and idx < tlen:
-                    weightsum += kernel[k]
-                    avg = add_transforms(avg, mult_transforms(transforms_abs[idx], kernel[k]))
+    transforms_filtered = [0]*len(transforms_abs)
+    tlen = len(transforms_abs)
+    for i in range(tlen):
+        ## make a convolution:
+        weightsum, avg = 0.0, datatypes.transform(0, 0, 0)
+        for k in range(s):
+            idx = i+k-mu
+            if idx >= 0 and idx < tlen:
+                weightsum += kernel[k]
+                avg = add_transforms(avg, mult_transforms(transforms_abs[idx], kernel[k]))
 
-            if weightsum > 0:
-                avg = mult_transforms(avg, 1.0/weightsum)
-                ## high frequency must be transformed away
-                transforms_filtered[i] = sub_transforms(transforms_abs[i], avg)
+        if weightsum > 0:
+            avg = mult_transforms(avg, 1.0/weightsum)
+            ## high frequency must be transformed away
+            transforms_filtered[i] = sub_transforms(transforms_abs[i], avg)
 
-        return transforms_filtered
+    return transforms_filtered
 
 
 def convert_relative_transforms_to_absolute(transforms_rel):
@@ -190,9 +220,6 @@ def get_fps(filepath):
 def to_upd_prjn_frames(frames_src_dir, frames_dst_dir, hugin_ptos_dir):
     cfg = config.cfg
 
-    if cfg.args.force_upd:
-        return True
-
     if cfg.args.vidstab_prjn != cfg.prev_args.vidstab_prjn:
         return True
 
@@ -214,48 +241,13 @@ def to_upd_prjn_frames(frames_src_dir, frames_dst_dir, hugin_ptos_dir):
     return False
 
 
-def to_upd_analyze(vidstab_dir, frames_dir):
-    cfg = config.cfg
-
-    if cfg.args.force_upd:
-        return True
-
-    # global_motions = os.path.join(vidstab_dir, "global_motions.trf")
-    # if not os.path.exists(global_motions):
-    #     return True
-
-    # imgs = sorted(os.listdir(frames_dir))
-    # path_img = path.join(frames_dir, imgs[0])
-    # global_motions_mtime = os.path.getmtime(global_motions)
-    # frame_mtime = os.path.getmtime(path_img)
-    # if frame_mtime > global_motions_mtime:
-    #     return True
-
-    transforms_trf = os.path.join(vidstab_dir, "transforms.trf")
-    if not os.path.exists(transforms_trf):
-        return True
-
-    imgs = sorted(os.listdir(frames_dir))
-    path_img = path.join(frames_dir, imgs[0])
-    transforms_mtime = os.path.getmtime(transforms_trf)
-    frame_mtime = os.path.getmtime(path_img)
-    if frame_mtime > transforms_mtime:
-        return True
-
-    if cfg.args.vs_mincontrast != cfg.prev_args.vs_mincontrast \
-       or cfg.args.vs_stepsize != cfg.prev_args.vs_stepsize:
-        return True
-
-    return False
-
-
 def rolling_shutter_args_changed():
     cfg = config.cfg
-
+    
     if cfg.args.rs_along != cfg.prev_args.rs_along \
        or cfg.args.rs_across != cfg.prev_args.rs_across \
-       or cfg.args.rs_roll != cfg.prev_args.rs_roll \
-       or cfg.args.rs_topdown != cfg.prev_args.rs_topdown:
+           or cfg.args.rs_roll != cfg.prev_args.rs_roll \
+               or cfg.args.rs_scan_up != cfg.prev_args.rs_scan_up:
         return True
 
     return False
@@ -268,46 +260,6 @@ def args_rolling_shutter():
        or float(cfg.args.rs_across) > 0 \
        or float(cfg.args.rs_roll) > 0:
         return True
-    return False
-
-
-def to_upd_camera_rotations(vidstab_dir):
-    cfg = config.cfg
-
-    if cfg.args.force_upd:
-        return True
-
-    if rolling_shutter_args_changed():
-        return True
-
-    if cfg.args.smoothing != cfg.prev_args.smoothing:
-        return True
-
-    #if not args_rolling_shutter():
-    pto_files = sorted(os.listdir(cfg.hugin_projects))
-    num_orig_frames = len(os.listdir(cfg.input_dir))
-
-    if not pto_files or len(pto_files) != num_orig_frames:
-        return True
-
-    pto_0 = path.join(cfg.hugin_projects, pto_files[0])
-    pto_mtime = os.path.getmtime(pto_0)
-
-    # global_motions = os.path.join(vidstab_dir, "global_motions.trf")
-    # global_motions_mtime = os.path.getmtime(global_motions)
-    # if pto_mtime < global_motions_mtime:
-    #     return True
-
-    transforms_trf = os.path.join(vidstab_dir, "transforms.trf")
-    transforms_mtime = os.path.getmtime(transforms_trf)
-    if pto_mtime < transforms_mtime:
-        return True
-
-    main_pto = cfg.args.pto
-    main_pto_mtime = os.path.getmtime(main_pto)
-    if pto_mtime < main_pto_mtime:
-        return True
-
     return False
 
 
@@ -349,17 +301,8 @@ def to_upd_camera_rotations_processed(vidstab_dir):
     return False
 
 
-def print_step(msg, frames_total=None):
-    print('_______')
-    if frames_total:
-        print(msg, f'{frames_total} frames total.')
-    else:
-        print(msg)
-    print()
-
-
 def print_progress(iteration, total, prefix = '', suffix = '', decimals = 1,
-                       length = 80, fill = '█'):
+                   length = 80, fill = '█'):
     """
     Call in a loop to create terminal progress bar
     @params:
@@ -393,8 +336,6 @@ class LM:
     vx: int = 0; vy: int = 0; fx: int = 0; fy: int = 0;
     fsize: int = 0; contrast: int = 0; match: int = 0
 
-
-from array import array
 
 def parseTransformsTrf(fpath):
     cfg = config.cfg
@@ -432,117 +373,86 @@ def parseTransformsTrf(fpath):
     frame_motions = [datatypes.transform(0.0, 0.0, 0.0)]
     for f_cnt, motions in enumerate(trf_frames):
 
-        ## mean motions
-        ## only calculates means transform to initialise gradient descent
+        match_quals = []
+        ## calculates means transform to initialise gradient descent
         if motions:
             xsum, ysum = 0.0, 0.0
-            for lm in motions:
-                xsum += lm.vx
-                ysum += lm.vy
-            t = array("f", [xsum/len(motions), ysum/len(motions), 0])
+            for ilm in range(len(motions)):
+                match_quals.append(motions[ilm].match)
+                xsum += motions[ilm].vx
+                ysum += motions[ilm].vy
+                t = array("f", [xsum/len(motions), ysum/len(motions), 0])
         else:
             t = array("f", [0.0]*3)
 
-        # # first we throw away those fields that match badly (during motion detection)
-        # match_qual = []
-        # for i in range(len(motions)):
-        #     match_qual.append(motions[i].match)
-        # match_mask = [0] * len(motions)
+        mu = stats.fmean(match_quals)
+        psd = stats.pstdev(match_quals, mu) # population standard distribution
 
-        # detect match_mask
-        #disableFields(match_mask, match_qual, 1.5)
-        disableFields(motions, 1.5)
-        
-        stepsizes = [0.2, 0.2, 0.00005, 0.1] # ss
+        # first we throw away those fields that match badly (during motion detection)
+        # filter fields by match quality
+        disableFields(motions, mu, psd, 1.5)
+
+        stepsizes = [0.2, 0.2, 0.00005] # x, y, roll
         residual = [0.0]
         for k in range(3):
             # optimize `t' to minimize transform quality (12 steps per dimension)
+            resgd = gradientDescent(t, motions, stepsizes.copy(), residual)
 
-            # resgd = gradientDescent(calcTransformQuality, t, motions, match_mask,
-            #                         stepsizes.copy(), residual)
-            resgd = gradientDescent(calcTransformQuality, t, motions,
-                                    stepsizes.copy(), residual)
-
-            
             # now we need to ignore the fields that don't fit well (e.g. moving objects)
             # cut off everything above 1 std. dev. for skewed distributions
             # this will cut off the tail
             # do this only two times (3 gradient optimizations in total)
             if (k == 0 and residual[0] > 0.1) or (k==1 and residual[0] > 20):
-                #disableFields(match_mask, match_qual, 1.0)
-                disableFields(motions, 1.0)
+                disableFields(motions, mu, psd, 1.0)
                 t = resgd
             else:
                 break
 
         frame_motions.append(datatypes.transform(resgd[0], resgd[1], resgd[2]))
-
         print_progress(f_cnt, len(trf_frames))
 
     return frame_motions
 
 
-def disableFields(motions, stddevs):
-    ''' Disables those fields (match_mask = -1) whose (miss)quality is high.
+def disableFields(motions, mu, psd, stddevs):
+    ''' Disables those fields whose (miss)quality is high.
     stddevs: x standard deviations to exclude
     '''
-    match_quals = []
+    #print(mu, stddevs * psd)
+    thresh = mu + stddevs * psd
     for i in range(len(motions)):
-        match_quals.append(motions[i].match)
-    
-    # throw away those fields that match badely (during motion detection)
-    mu = stats.fmean(match_quals)
-    thresh = mu + stddevs * stats.pstdev(match_quals, mu)
-    for i in range(len(motions)):
-        if motions[i].match > thresh: motions[i] = False
+        m = motions[i]
+        if m and m.match > thresh: motions[i] = False
 
 
-# def disableFields(match_mask, match_quals, stddevs):
-#     ''' Disables those fields (match_mask = -1) whose (miss)quality is high.
-#     match_mask: fields masks (<0 means disabled)
-#     match_quals: measure for each field (larger is worse)
-#     stddevs: x standard deviations to exclude
-#     '''
-#     # throw away those fields that match badely (during motion detection)
-#     mu = stats.fmean(match_quals)
-#     thresh = mu + stddevs * stats.pstdev(match_quals, mu)
-#     for i in range(len(match_quals)):
-#         if match_quals[i] > thresh: match_mask[i] = -1.0
+def gradientDescent(t, motions, stepsizes, residual):
 
-
-def gradientDescent(qual_func, t, motions, stepsizes, residual):
-#def gradientDescent(qual_func, t, motions, match_mask, stepsizes, residual):
-
+    qual = calcTransformQuality
+    dim = 3 # x, y, roll
+    threshold = 0.01
     N = 16
-    thresh = 0.01
-    # stepsizes is [0.2, 0.2, 0.00005, 0.1]
+    # stepsizes is [0.2, 0.2, 0.00005]
 
-    #v = qual_func(t, motions, match_mask)
-    v = qual_func(t, motions)
+    # initial call
+    v = qual(t, motions)
 
-    dim = len(t)
     x = array("f", t)
-
     i = 0
-    while i < N*dim and v > thresh:
+    while i < N*dim and v > threshold:
         k = i % dim
+
         x2 = array("f", x)
-        if random.randrange(2**16) % 2:
-            h = 1e-6
-        else:
-            h = -1e-6
+        if random.randrange(2**16) % 2: h = 1e-6
+        else: h = -1e-6
+
         x2[k] += h
-        #v2 = qual_func(x2, motions, match_mask)
-        v2 = qual_func(x2, motions)
-        grad = [0]*dim
-        grad[k] = (v - v2)/h
+        v2 = qual(x2, motions)
 
-        for i3 in range(dim):
-            x2[i3] = x[i3] + (grad[i3] * stepsizes[k])
+        x2 = array("f", x)
+        x2[k] = x[k] + ((v - v2)/h) * stepsizes[k]
 
-        #v2 = qual_func(x2, motions, match_mask)
-        v2 = qual_func(x2, motions)
-        if v2 < v:
+        v2 = qual(x2, motions)
+        if v2 < v: # lower average error
             x, v = x2, v2
             stepsizes[k] *= 1.2 # increase stepsize (4 successful steps will double it)
         else:
@@ -550,43 +460,38 @@ def gradientDescent(qual_func, t, motions, stepsizes, residual):
 
         i += 1
 
-    if residual[0]:
-        residual[0] = v
+    residual[0] = v
 
     return x
 
 
 def calcTransformQuality(t, motions):
-#def calcTransformQuality(t, motions, match_mask):
     cfg = config.cfg
     error = 0.0
-    roll = t[2]
+    tx, ty, roll = t[0], t[1], t[2]
 
-    # prepared transform
-    cos_a = math.cos(roll)
-    sin_a = math.sin(roll)
-    c_x = cfg.pto.orig_w / 2
-    c_y = cfg.pto.orig_h / 2
+    cos_a, sin_a = math.cos(roll), math.sin(roll)
+    c_x, c_y = cfg.pto.orig_w/2, cfg.pto.orig_h/2
 
-    num = 1 # we start with 1 to avoid div by zero
-    for i in range(len(motions)):
-        #if match_mask[i] >= 0:
-        if motions[i]:
-            m = motions[i]
+    num = 1 # start with 1 to avoid div by zero
+    for m in motions:
+        if m:
+            # fx, fy: middle position of a field
+            rx, ry = m.fx - c_x, m.fy - c_y
+            vx = ( cos_a*rx + sin_a*ry + c_x + tx) - m.fx
+            vy = (-sin_a*rx + cos_a*ry + c_y + ty) - m.fy
 
-            ## transform_vec_double
-            rx = m.fx - c_x
-            ry = m.fy - c_y
-            vx = ( cos_a * rx + sin_a * ry + t[0] + c_x) - m.fx
-            vy = (-sin_a * rx + cos_a * ry + t[1] + c_y) - m.fy
+            # initial call
+            # vx = ( rx + c_x + tx) - m.fx,  = tx
+            # vy = ( ry + c_y + ty) - m.fy,  = ty
 
-            d1, d2 = vx - m.vx, vy - m.vy
-            e = d1*d1 + d2*d2
-            #match_mask[i] = e
-            error += e
+            # roll pass
+            # vx = ( rx + 0.000001*ry + c_x + tx) - m.fx,  = tx
+            # vy = ( ry + 0.000001*rx + c_y + ty) - m.fy,  = ty
+
+            error += math.pow(vx-m.vx, 2) + math.pow(vy-m.vy, 2)
             num += 1
 
     # 1 pixel translation missmatch is roughly (with size 500):
-    # roll=0.11 (degree), zoom=0.2; The zoom is however often much larger, so less penalty.
-    # return error/num + abs(roll)/5.0 + abs(zoom)/500.0
+    # roll=0.11 (degree)
     return error/num + abs(roll)/5.0

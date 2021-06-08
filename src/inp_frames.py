@@ -1,6 +1,5 @@
 import utils
 import datatypes
-
 import os
 from os import path
 import sys
@@ -8,6 +7,7 @@ from multiprocessing import Pool
 from subprocess import run, DEVNULL
 import functools
 import re
+import datetime as dt
 
 
 class InFrames():
@@ -23,34 +23,30 @@ class InFrames():
         '''Creates frame image files from a video'''
         cfg = self.cfg
 
-        ## check if input videofile was modified
-        frames_dir = cfg.input_dir
-        imgs = sorted(os.listdir(frames_dir))
-        if os.path.exists(cfg.args.videofile) and len(imgs) \
-           and not cfg.args.force_upd:
-            path_img = path.join(frames_dir, imgs[0])
-            video_mtime = os.path.getmtime(cfg.args.videofile)
-            frame_mtime = os.path.getmtime(path_img)
-            if (video_mtime < frame_mtime):
-                return
-
         utils.delete_files_in_dir(cfg.input_dir)
 
         inp = cfg.args.videofile
 
+        ## "-src_range", "1", # src is full range, 0-255
         cmd = ['ffmpeg',
                '-loglevel', 'error',
                '-stats',
                '-i', inp,
                "-src_range", "1", # src is full range, 0-255
-               "-vsync", "drop", ## important to avoid 1st and 2 frames duplicated
+               "-vsync", "drop",  # important to avoid 1st and 2 frames duplicated
                '-q:v', '1',
                path.join(cfg.input_dir, '%6d.jpg'), '-y'
                ]
 
 
         print(f'Store frames of {cfg.args.videofile}')
+        #print(cmd)
+        s = dt.datetime.now()
         run(cmd, check=True)
+        ## important for other code, `utils.print_time'
+        cfg.frames_total = len(os.listdir(cfg.input_dir))
+        e = dt.datetime.now() - s
+        utils.print_time(e.total_seconds())
 
         ## remove first frame, can be a duplicate with the second in some cases
         # imgs = sorted(os.listdir(frames_dir))

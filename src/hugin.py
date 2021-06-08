@@ -17,9 +17,6 @@ def frames_output(task, all_out_frames, frames_stabilized_dir):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
 
-    # print(task)
-    # hugin_task(img='000001.jpg', pto_file='000001.jpg.pto')
-
     if utils.args_rolling_shutter():
         hugin_ptos_dir = cfg.hugin_projects_processed
     else:

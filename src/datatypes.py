@@ -8,6 +8,7 @@ class transform:
     y: float
     roll: float
 
+
 @dataclass
 class hugin_task:
     img: str
@@ -18,7 +19,7 @@ class HuginPTO:
     '''Hugin project, PanoTools Optimizer, "pto".
     Collects parameters only for the first image in project,
     which represents a video frame in context of this program.'''
-    
+
     filepath = None
     is_rectilinear = False
     pto_lines = []
@@ -36,14 +37,14 @@ class HuginPTO:
 
     def __init__(self, filepath):
         self.parse_pto(filepath)
-    
+
     def parse_pto(self, filepath):
         crop_list = None
         f = open(filepath)
         self.filepath = filepath
 
         lines = f.read().splitlines()
-        for line in lines:            
+        for line in lines:
             line = str(line.strip())
             if line.startswith('#'):
                 continue
@@ -71,7 +72,7 @@ class HuginPTO:
                         crop_list = p[1:].split(',')
                     elif p.startswith('v'):
                         self.canv_half_hfov = float(p[1:])/2
-            
+
             if not first_image_found and line.startswith('i'):
                 parts = line.split()
                 if parts:
@@ -98,7 +99,7 @@ class HuginPTO:
         tan_pix = horizontal_max_tan/(self.crop_w/2)
         vert_max_tan = (self.crop_h/2)*tan_pix
         self.half_vfov = math.degrees(math.atan(vert_max_tan))
-    
+
     def unpack_crop(self, crop):
         if crop:
             self.crop_l = int(crop[0])

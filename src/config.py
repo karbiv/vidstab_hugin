@@ -1,3 +1,4 @@
+import os
 from os import path
 import re
 from pathlib import Path
@@ -11,7 +12,7 @@ class Configuration:
 
         self.args = args
 
-        self.project_pto = path.join(args.workdir, "result.pto")
+        self.project_pto = path.join(args.workdir, args.pto_name)
         args.pto = self.project_pto
 
         if not path.isfile(args.videofile):
@@ -19,28 +20,26 @@ class Configuration:
         else:
             self.fps = str(round(utils.get_fps(args.videofile)))
 
+        self.frames_total = 0
+
         self.pto = HuginPTO(self.project_pto)
 
         ## create output video subdir tree
         data_dir_name = re.sub(r'[/\\.]+', '_', args.videofile).strip('_')
         self.data_dir = path.join(path.abspath(args.workdir), data_dir_name)
-        self.workdir = Path(path.join(self.data_dir, '0__workdir'))
-        self.workdir.mkdir(parents=True, exist_ok=True)
-        self.hugin_projects = Path(path.join(self.workdir, 'hugin_ptos'))
-        self.hugin_projects.mkdir(parents=True, exist_ok=True)
-        self.hugin_projects_processed = Path(path.join(self.workdir, 'hugin_ptos_processed'))
-        self.hugin_projects_processed.mkdir(parents=True, exist_ok=True)
-        self.projection_pto_path = path.join(self.workdir, 'vidstab_projection.pto')
-        #self.rectilinear_pto_path = path.join(self.workdir, 'rectilinear.pto')
-        self.rectilinear_pto_path = path.join(path.abspath(args.workdir), 'rectilinear.pto')
+
+        # self.workdir = Path(path.join(self.data_dir, '0__workdir'))
+        # self.workdir.mkdir(parents=True, exist_ok=True)
+
+        ## saved command args file
+        self.cmd_args = path.join(self.data_dir, 'cmd_args.txt')
 
         self.input_dir = Path(path.join(self.data_dir, '1__input_frames'))
         self.input_dir.mkdir(parents=True, exist_ok=True)
 
-        ### Lens projections
         self.prjn_video_name = "input_projection.mkv"
 
-        self.prjn_basedir1 = Path(path.join(self.data_dir, '2__lens_projection_frames_for_vidstab'))
+        self.prjn_basedir1 = Path(path.join(self.data_dir, '2__vidstab_detect'))
         self.prjn_basedir1.mkdir(parents=True, exist_ok=True)
         self.prjn_dir1_frames = Path(path.join(self.prjn_basedir1, 'frames'))
         self.prjn_dir1_frames.mkdir(parents=True, exist_ok=True)
@@ -49,12 +48,21 @@ class Configuration:
         self.prjn_dir1_vidstab_prjn = Path(path.join(self.prjn_basedir1, 'vidstab_pass_prjn'))
         self.prjn_dir1_vidstab_prjn.mkdir(parents=True, exist_ok=True)
 
-        self.rolling_shutter = Path(path.join(self.data_dir, '3__rolling_shutter'))
+        self.rolling_shutter = Path(path.join(self.data_dir, '3__camera_moves'))
         self.rolling_shutter.mkdir(parents=True, exist_ok=True)
-        self.frames_input_processed = Path(path.join(self.rolling_shutter, 'original_frames_processed'))
+
+        self.projection_pto_path = path.join(self.rolling_shutter, 'vidstab_projection.pto')
+        self.rectilinear_pto_path = path.join(self.rolling_shutter, 'rectilinear.pto')
+        #self.rectilinear_pto_path = path.join(path.abspath(args.workdir), 'rectilinear.pto')
+        
+        self.hugin_projects = Path(path.join(self.rolling_shutter, 'hugin_ptos'))
+        self.hugin_projects.mkdir(parents=True, exist_ok=True)
+        self.hugin_projects_processed = Path(path.join(self.rolling_shutter, 'hugin_ptos_processed'))
+        self.hugin_projects_processed.mkdir(parents=True, exist_ok=True)
+        self.frames_input_processed = Path(path.join(self.rolling_shutter, 'input_frames_processed'))
         self.frames_input_processed.mkdir(parents=True, exist_ok=True)
 
-        self.prjn_basedir2 = Path(path.join(self.data_dir, '4__lens_projection_frames_for_vidstab'))
+        self.prjn_basedir2 = Path(path.join(self.data_dir, '4__vidstab_detect'))
         self.prjn_basedir2.mkdir(parents=True, exist_ok=True)
         self.prjn_dir2_frames = Path(path.join(self.prjn_basedir2, 'frames'))
         self.prjn_dir2_frames.mkdir(parents=True, exist_ok=True)
@@ -70,8 +78,5 @@ class Configuration:
         self.out_video_name = 'out_video.mkv'
         self.out_video_prjn_name = 'out_video_prjn_vidstab.mkv'
         self.out_video_dir = self.data_dir
-
-        ## saved command args file
-        self.cmd_args = path.join(self.workdir, 'cmd_args.txt')
 
 cfg: Configuration = None

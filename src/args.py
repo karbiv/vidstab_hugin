@@ -46,14 +46,13 @@ max_cpus = 32
 max_smoothing = 100
 default_smoothing_percent_of_fps = 71
 stepsize = 6
-xy_dflt, roll_dflt = 0, 0
 
 if cpu_count() == 2:
     num_cpus_default = 1
 elif cpu_count() == 4:
     num_cpus_default = 3
 else:
-    num_cpus_default = cpu_count() - 2
+    num_cpus_default = cpu_count()
 
 
 def init_cmd_args(parser):
@@ -66,6 +65,10 @@ def init_cmd_args(parser):
 
     parser.add_argument('--workdir', type=str, nargs='?', required=True,
                         help='Path to where video render work is done;')
+
+    parser.add_argument('--pto-name', type=str, nargs='?', required=True,
+                        help='Hugin PTO(project) file to render frames.'+\
+                        'Must reside in `--workdir`.')
 
     parser.add_argument('--num-cpus', type=int, nargs='?', required=False,
                         default=num_cpus_default,
@@ -82,7 +85,7 @@ def init_cmd_args(parser):
     vidstab_group = parser.add_argument_group('libvidstab arguments')
 
     vidstab_group.add_argument('--vs-mincontrast', type=float, nargs='?', required=False,
-                               default=0.4,
+                               default=0.3,
                                metavar=f'0.1 ... 1.0',
                                help='Libvidstab mincontrast')
 
@@ -93,21 +96,25 @@ def init_cmd_args(parser):
 
     rs_group = parser.add_argument_group('rolling shutter')
 
-    rs_group.add_argument('--rs-topdown', required=False,
+    rs_group.add_argument('--rs-scan-up', required=False,
                           action='store_true',
                           default=False,
                           help='Scanning direction of lines in the CMOS image sensor: 0=bottom-up, 1=top-down.'
                           'Depends on how the camera was held when shooting.')
 
     rs_group.add_argument('--rs-along', type=float, nargs='?', required=False,
-                          default=xy_dflt,
+                          default=0,
                           help='Rolling shutter correction coefficient for translation along lines.')
     rs_group.add_argument('--rs-across', type=float, nargs='?', required=False,
-                          default=xy_dflt,
+                          default=0,
                           help='Rolling shutter correction coefficient for translation of lines(up or down).')
+
+    # rs_group.add_argument('--rs-xy', type=float, nargs='?', required=False,
+    #                       default=0,
+    #                       help='Rolling shutter correction coefficient for translation along&across lines.')
     
     rs_group.add_argument('--rs-roll', type=float, nargs='?', required=False,
-                          default=roll_dflt,
+                          default=0,
                           help='Rolling shutter correction coefficient for camera roll.')
     rs_group.add_argument('--rs-interpolation', type=int, nargs='?', required=False,
                           default=1, choices=range(0, 5),
@@ -136,3 +143,7 @@ def init_cmd_args(parser):
     parser.add_argument('--with-audio', required=False, default=False,
                         action='store_true',
                         help='Copy audio stream(if exists) from input video to output video.')
+
+    parser.add_argument('--debug', required=False,
+                        default=False, action='store_true',
+                        help='Show debug message in code')
