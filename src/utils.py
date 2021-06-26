@@ -275,12 +275,12 @@ def to_upd_camera_rotations_processed(vidstab_dir):
     if cfg.args.smoothing != cfg.prev_args.smoothing:
         return True
 
-    pto_files = sorted(os.listdir(cfg.hugin_projects_processed))
-    num_inp_frames = len(os.listdir(cfg.frames_input_processed))
+    pto_files = sorted(os.listdir(cfg.hugin_projects))
+    num_inp_frames = len(os.listdir(cfg.frames_processed))
     if not pto_files or len(pto_files) != num_inp_frames:
         return True
 
-    pto_0 = path.join(cfg.hugin_projects_processed, pto_files[0])
+    pto_0 = path.join(cfg.hugin_projects, pto_files[0])
     pto_mtime = os.path.getmtime(pto_0)
 
     # global_motions = os.path.join(vidstab_dir, "global_motions.trf")

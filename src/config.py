@@ -25,8 +25,8 @@ class Configuration:
         self.pto = HuginPTO(self.project_pto)
 
         ## create output video subdir tree
-        data_dir_name = re.sub(r'[/\\.]+', '_', args.videofile).strip('_')
-        self.data_dir = path.join(path.abspath(args.workdir), data_dir_name)
+        self.data_dir_name = re.sub(r'[/\\.]+', '_', args.videofile).strip('_')
+        self.data_dir = path.join(path.abspath(args.workdir), self.data_dir_name)
 
         # self.workdir = Path(path.join(self.data_dir, '0__workdir'))
         # self.workdir.mkdir(parents=True, exist_ok=True)
@@ -37,46 +37,31 @@ class Configuration:
         self.input_dir = Path(path.join(self.data_dir, '1__input_frames'))
         self.input_dir.mkdir(parents=True, exist_ok=True)
 
-        self.prjn_video_name = "input_projection.mkv"
+        self.vidstab1_dir = Path(path.join(self.data_dir, '2__vidstab_detect'))
+        self.vidstab1_dir.mkdir(parents=True, exist_ok=True)
 
-        self.prjn_basedir1 = Path(path.join(self.data_dir, '2__vidstab_detect'))
-        self.prjn_basedir1.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir1_frames = Path(path.join(self.prjn_basedir1, 'frames'))
-        self.prjn_dir1_frames.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir1_vidstab_orig = Path(path.join(self.prjn_basedir1, 'vidstab_pass_orig'))
-        self.prjn_dir1_vidstab_orig.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir1_vidstab_prjn = Path(path.join(self.prjn_basedir1, 'vidstab_pass_prjn'))
-        self.prjn_dir1_vidstab_prjn.mkdir(parents=True, exist_ok=True)
+        self.camera_moves_path = Path(path.join(self.data_dir, '3__camera_moves'))
+        self.camera_moves_path.mkdir(parents=True, exist_ok=True)
 
-        self.rolling_shutter = Path(path.join(self.data_dir, '3__camera_moves'))
-        self.rolling_shutter.mkdir(parents=True, exist_ok=True)
+        self.trf_rel_path = path.join(self.camera_moves_path, 'trf_rel.pickle')
+        self.trf_abs_filtered_path = path.join(self.camera_moves_path, 'trf_abs_filtered.pickle')
 
-        self.projection_pto_path = path.join(self.rolling_shutter, 'vidstab_projection.pto')
-        self.rectilinear_pto_path = path.join(self.rolling_shutter, 'rectilinear.pto')
-        #self.rectilinear_pto_path = path.join(path.abspath(args.workdir), 'rectilinear.pto')
+        self.projection_pto_path = path.join(self.camera_moves_path, 'vidstab_projection.pto')
+        self.rectilinear_pto_path = path.join(self.camera_moves_path, 'rectilinear.pto')
         
-        self.hugin_projects = Path(path.join(self.rolling_shutter, 'hugin_ptos'))
+        self.hugin_projects = Path(path.join(self.camera_moves_path, 'hugin_ptos'))
         self.hugin_projects.mkdir(parents=True, exist_ok=True)
-        self.hugin_projects_processed = Path(path.join(self.rolling_shutter, 'hugin_ptos_processed'))
-        self.hugin_projects_processed.mkdir(parents=True, exist_ok=True)
-        self.frames_input_processed = Path(path.join(self.rolling_shutter, 'input_frames_processed'))
-        self.frames_input_processed.mkdir(parents=True, exist_ok=True)
+        self.frames_processed = Path(path.join(self.camera_moves_path, 'frames_processed'))
+        self.frames_processed.mkdir(parents=True, exist_ok=True)
 
-        self.prjn_basedir2 = Path(path.join(self.data_dir, '4__vidstab_detect'))
-        self.prjn_basedir2.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir2_frames = Path(path.join(self.prjn_basedir2, 'frames'))
-        self.prjn_dir2_frames.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir2_vidstab_orig = Path(path.join(self.prjn_basedir2, 'vidstab_pass_orig'))
-        self.prjn_dir2_vidstab_orig.mkdir(parents=True, exist_ok=True)
-        self.prjn_dir2_vidstab_prjn = Path(path.join(self.prjn_basedir2, 'vidstab_pass_prjn'))
-        self.prjn_dir2_vidstab_prjn.mkdir(parents=True, exist_ok=True)
-        self.input_processed_video_path = path.join(self.prjn_basedir2, 'processed_input.mkv')
+        self.vidstab2_dir = Path(path.join(self.data_dir, '4__vidstab_detect'))
+        self.vidstab2_dir.mkdir(parents=True, exist_ok=True)
 
         self.frames_stabilized = Path(path.join(self.data_dir, '5__stabilized_frames'))
         self.frames_stabilized.mkdir(parents=True, exist_ok=True)
 
         self.out_video_name = 'out_video.mkv'
-        self.out_video_prjn_name = 'out_video_prjn_vidstab.mkv'
         self.out_video_dir = self.data_dir
+
 
 cfg: Configuration = None

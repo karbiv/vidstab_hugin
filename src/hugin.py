@@ -17,14 +17,9 @@ def frames_output(task, all_out_frames, frames_stabilized_dir):
     '''Used by multiprocessing.Pool'''
     cfg = config.cfg
 
-    if utils.args_rolling_shutter():
-        hugin_ptos_dir = cfg.hugin_projects_processed
-    else:
-        hugin_ptos_dir = cfg.hugin_projects
-    
     #out_img = path.join(cfg.current_output_path, task.img)
     out_img = path.join(frames_stabilized_dir, task.img)
-    task_pto_path = path.join(hugin_ptos_dir, task.pto_file)
+    task_pto_path = path.join(cfg.hugin_projects, task.pto_file)
 
     # create only missing out frames
     if not all_out_frames and path.exists(out_img):

@@ -60,16 +60,20 @@ def main():
         'STEP_2: analyze cam motions in input video.',
         convey.to_upd_analyze,
         vs.analyze)
-    
+
     add_step(
-        'STEP_3: camera rotations in Hugin.',
+        "STEP_3: parse vidstab's trf file.",
+        convey.to_upd_trf_parse,
+        out_frms.parseTransforms)
+
+    if utils.args_rolling_shutter():
+        msg = 'STEP_4: create corrected rolling shutter frames.'
+    else:
+        msg = "STEP_4: create PTO files for Hugin."
+    add_step(
+        msg,
         convey.to_upd_camera_rotations,
         out_frms.compute_hugin_camera_rotations)
-    
-    add_step(
-        'STEP_4: analyze cam moves with corrected Rolling Shutter.',
-        convey.to_upd_rs_analyze,
-        convey.rs_analyze)
     
     add_step(
         'STEP_5: create stabilized frames, Hugin.',

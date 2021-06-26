@@ -63,17 +63,17 @@ class Conveyor:
         force_upd = False
         if cfg.args.force_upd:
             force_upd = True
-            
+
         if step == 0:
             ## all steps
             for s in self.steps:
-                print_step(s.msg)
+                print_step(s.msg, cfg.frames_total)
                 self.try_step(s, force_upd)
         elif step > 1:
             ## check readiness of prev steps
             for si in range(step):
                 s = self.steps[si]
-                print_step(s.msg)
+                print_step(s.msg, cfg.frames_total)
                 if force_upd and si+1 == step:
                     self.try_step(s, True)
                 else:
@@ -87,10 +87,11 @@ class Conveyor:
             try:
                 step.check() # for side effects
             except:
-                pass
-            step.make()
+                step.make()
+            else:
+                step.make()
             return
-        
+
         try:
             step.check()
         except StepUpd as supd:
@@ -150,30 +151,12 @@ class Conveyor:
             raise StepUpd()
 
 
-    curr_input_video = ''
-    curr_vidstab_dir = ''
-
     ## in progress, from utils module
     def to_upd_analyze(self):
         cfg = self.cfg
 
-        ## TODO move out creation
-        if cfg.args.vidstab_prjn > -1:
-            cfg.inframes.create_projection_frames(cfg.input_dir,
-                                                  cfg.prjn_dir1_frames,
-                                                  cfg.hugin_projects)
-            self.curr_input_video = cfg.inframes.create_input_video_for_vidstab(
-                cfg.prjn_dir1_frames,
-                cfg.prjn_dir1_vidstab_prjn)
-            self.curr_vidstab_dir = cfg.prjn_dir1_vidstab_prjn
-            frames_dir = cfg.prjn_dir1_frames
-        else:
-            self.curr_input_video = cfg.args.videofile
-            self.curr_vidstab_dir = cfg.prjn_dir1_vidstab_orig
-            print("here conveyor ", self.curr_vidstab_dir)
-            frames_dir = cfg.input_dir
-
-        transforms_trf = os.path.join(self.curr_vidstab_dir, "transforms.trf")
+        frames_dir = cfg.input_dir
+        transforms_trf = os.path.join(cfg.vidstab1_dir, "transforms.trf")
         if not os.path.exists(transforms_trf):
             raise StepUpd()
 
@@ -184,15 +167,30 @@ class Conveyor:
         if frame_mtime > transforms_mtime:
             raise StepUpd()
 
-        if cfg.args.vidstab_prjn > -1:
-            main_pto = cfg.args.pto
-            main_pto_mtime = os.path.getmtime(main_pto)
-            if main_pto_mtime > transforms_mtime:
-                raise StepUpd()
-
         if cfg.args.vs_mincontrast != cfg.prev_args.vs_mincontrast \
            or cfg.args.vs_stepsize != cfg.prev_args.vs_stepsize:
             raise StepUpd()
+
+
+    def to_upd_trf_parse(self):
+        cfg = self.cfg
+
+        if cfg.args.smoothing != cfg.prev_args.smoothing:
+            raise StepUpd()
+
+        if not os.path.exists(cfg.trf_rel_path) \
+           or not os.path.exists(cfg.trf_abs_filtered_path):
+            raise StepUpd()
+
+        trf_rel_path_mtime = os.path.getmtime(cfg.trf_rel_path)
+        trf_abs_filtered_path_mtime = os.path.getmtime(cfg.trf_abs_filtered_path)
+        transforms_trf = os.path.join(cfg.vidstab1_dir, "transforms.trf")
+        transforms_mtime = os.path.getmtime(transforms_trf)
+
+        if trf_rel_path_mtime < transforms_mtime \
+           or trf_abs_filtered_path_mtime < transforms_mtime:
+            raise StepUpd()
+
 
 
     def to_upd_camera_rotations(self):
@@ -204,26 +202,29 @@ class Conveyor:
         if cfg.args.smoothing != cfg.prev_args.smoothing:
             raise StepUpd()
 
-        if cfg.args.vidstab_prjn > -1:
-            self.curr_vidstab_dir = cfg.prjn_dir1_vidstab_prjn
-        else:
-            self.curr_vidstab_dir = cfg.prjn_dir1_vidstab_orig
-
-        transforms_trf = os.path.join(self.curr_vidstab_dir, "transforms.trf")
-        transforms_mtime = os.path.getmtime(transforms_trf)
         main_pto = cfg.args.pto
         main_pto_mtime = os.path.getmtime(main_pto)
 
+        trf_rel_path_mtime = os.path.getmtime(cfg.trf_rel_path)
+        trf_abs_filtered_path_mtime = os.path.getmtime(cfg.trf_abs_filtered_path)
+
         if utils.args_rolling_shutter():
-            rs_frames = sorted(os.listdir(cfg.frames_input_processed))
+            rs_frames = sorted(os.listdir(cfg.frames_processed))
+
             if len(rs_frames):
-                path_img = path.join(cfg.frames_input_processed,
+                path_img = path.join(cfg.frames_processed,
                                      rs_frames[0])
                 rs_frame_mtime = os.path.getmtime(path_img)
-                if rs_frame_mtime < transforms_mtime:
+                if rs_frame_mtime < trf_rel_path_mtime \
+                   or rs_frame_mtime < trf_abs_filtered_path_mtime:
                     raise StepUpd()
             else:
                 raise StepUpd()
+
+            num_orig_frames = len(os.listdir(cfg.input_dir))
+            if num_orig_frames > len(rs_frames):
+                raise StepUpd()
+            
         else:
             pto_files = sorted(os.listdir(cfg.hugin_projects))
             num_orig_frames = len(os.listdir(cfg.input_dir))
@@ -232,7 +233,8 @@ class Conveyor:
                     raise StepUpd()
                 pto_0 = path.join(cfg.hugin_projects, pto_files[0])
                 pto_mtime = os.path.getmtime(pto_0)
-                if pto_mtime < transforms_mtime:
+                if pto_mtime < trf_rel_path_mtime \
+                   or pto_mtime < trf_abs_filtered_path_mtime:
                     raise StepUpd()
                 if pto_mtime < main_pto_mtime:
                     #msg = f'Result PTO updated, '
@@ -244,28 +246,9 @@ class Conveyor:
     def to_upd_rs_analyze(self):
         cfg = self.cfg
 
-        if not utils.args_rolling_shutter():
-            msg = "Used only with Rolling Shutter args, vidstab pass."
-            raise StepSkip(msg)
+        ## next code identical to `self.to_upd_analyze()'
 
-        ## TODO move out creation
-        if cfg.args.vidstab_prjn > -1:
-            cfg.inframes.create_projection_frames(cfg.frames_input_processed,
-                                                  cfg.prjn_dir2_frames,
-                                                  cfg.hugin_projects_processed)
-            self.curr_input_video = cfg.inframes.create_input_video_for_vidstab(
-                cfg.prjn_dir2_frames,
-                cfg.prjn_dir2_vidstab_prjn)
-            self.curr_vidstab_dir = cfg.prjn_dir2_vidstab_prjn
-            frames_dir = cfg.prjn_dir2_frames
-        else:
-            self.curr_input_video = cfg.input_processed_video_path
-            self.curr_vidstab_dir = cfg.prjn_dir2_vidstab_orig
-            frames_dir = cfg.frames_input_processed
-
-        ## next code identical to `slef.to_upd_analyze()'
-
-        transforms_trf = os.path.join(self.curr_vidstab_dir, "transforms.trf")
+        transforms_trf = os.path.join(cfg.vidstab2_dir, "transforms.trf")
         if not os.path.exists(transforms_trf):
             raise StepUpd()
         transforms_mtime = os.path.getmtime(transforms_trf)
@@ -275,8 +258,8 @@ class Conveyor:
         if main_pto_mtime > transforms_mtime:
             raise StepUpd()
 
-        imgs = sorted(os.listdir(frames_dir))
-        path_img = path.join(frames_dir, imgs[0])
+        imgs = sorted(os.listdir(cfg.frames_processed))
+        path_img = path.join(cfg.frames_processed, imgs[0])
 
         frame_mtime = os.path.getmtime(path_img)
         if frame_mtime > transforms_mtime:
@@ -287,24 +270,66 @@ class Conveyor:
             raise StepUpd()
 
 
-    def rs_analyze(self):
-        cfg = self.cfg
-        cfg.vidstab.analyze2()
-        cfg.out_frms.compute_hugin_camera_rotations_processed()
-
-
-    curr_hugin_ptos_dir = ''
     all_out_frames = True
 
     def to_upd_out_frames(self):
         cfg = self.cfg
-
+        
         if utils.args_rolling_shutter():
-            self.curr_hugin_ptos_dir = cfg.hugin_projects_processed
-        else:
-            self.curr_hugin_ptos_dir = cfg.hugin_projects
 
-        pto_files = sorted(os.listdir(self.curr_hugin_ptos_dir))
+            to_upd_vidstab = False
+            try:
+                transforms_trf = os.path.join(cfg.vidstab2_dir, "transforms.trf")
+                if not os.path.exists(transforms_trf):
+                    to_upd_vidstab = True
+                    raise StepUpd()
+                transforms_mtime = os.path.getmtime(transforms_trf)
+
+                main_pto = cfg.args.pto
+                main_pto_mtime = os.path.getmtime(main_pto)
+                if main_pto_mtime > transforms_mtime:
+                    raise StepUpd()
+
+                imgs = sorted(os.listdir(cfg.frames_processed))
+                path_img = path.join(cfg.frames_processed, imgs[0])
+
+                frame_mtime = os.path.getmtime(path_img)
+                if frame_mtime > transforms_mtime:
+                    to_upd_vidstab = True
+                    raise StepUpd()
+
+                if cfg.args.vs_mincontrast != cfg.prev_args.vs_mincontrast \
+                   or cfg.args.vs_stepsize != cfg.prev_args.vs_stepsize:
+                    to_upd_vidstab = True
+                    raise StepUpd()
+
+                trf_rel_path_mtime = os.path.getmtime(cfg.trf_rel_path)
+                trf_abs_filtered_path_mtime = os.path.getmtime(cfg.trf_abs_filtered_path)
+                
+                pto_files = sorted(os.listdir(cfg.hugin_projects))
+                num_orig_frames = len(os.listdir(cfg.input_dir))
+                if pto_files:
+                    if len(pto_files) != num_orig_frames:
+                        raise StepUpd()
+                    pto_0 = path.join(cfg.hugin_projects, pto_files[0])
+                    pto_mtime = os.path.getmtime(pto_0)
+                    if pto_mtime < trf_rel_path_mtime \
+                       or pto_mtime < trf_abs_filtered_path_mtime:
+                        raise StepUpd()
+                    if pto_mtime < main_pto_mtime:
+                        #msg = f'Result PTO updated, '
+                        raise StepUpd()
+                else:
+                    raise StepUpd()
+                
+            except StepUpd as supd:
+                if to_upd_vidstab:
+                    cfg.vidstab.analyze2()
+                cfg.out_frms.compute_hugin_camera_rotations_processed()
+            except Exception as e:
+                raise e
+        
+        pto_files = sorted(os.listdir(cfg.hugin_projects))
         stabilized_imgs = sorted(os.listdir(cfg.frames_stabilized))
 
         ptos_len = len(pto_files)
@@ -316,7 +341,7 @@ class Conveyor:
         if out_frames_len:
             path_img = path.join(cfg.frames_stabilized, stabilized_imgs[0])
             frame_mtime = os.path.getmtime(path_img)
-            path_pto = path.join(self.curr_hugin_ptos_dir, pto_files[0])
+            path_pto = path.join(cfg.hugin_projects, pto_files[0])
             pto_mtime = os.path.getmtime(path_pto)
             if pto_mtime < frame_mtime and self.all_out_frames:
                 return
@@ -328,15 +353,10 @@ class Conveyor:
             raise StepUpd()
 
 
-    curr_out_video_path = ''
-
     def to_upd_out_video(self):
         cfg = self.cfg
 
-        if cfg.args.vidstab_prjn > -1:
-            self.out_video_path = path.join(cfg.out_video_dir, cfg.out_video_prjn_name)
-        else:
-            self.out_video_path = path.join(cfg.out_video_dir, cfg.out_video_name)
+        self.out_video_path = path.join(cfg.out_video_dir, cfg.out_video_name)
 
         output = path.join(cfg.out_video_dir, self.out_video_path)
         if not os.path.exists(output):
@@ -358,7 +378,7 @@ def print_step(msg, frames_total=None):
     print()
     print('_______')
     if frames_total:
-        print(msg, f'{frames_total} frames total.')
+        print(msg, f'{frames_total} frames.')
     else:
         print(msg)
         print()
